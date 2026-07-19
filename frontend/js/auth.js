@@ -1,17 +1,19 @@
 /* ============================================
-   今晚吃什么 — 登录/注册（localStorage Mock）
+   今晚吃什么 — 登录/注册（后端 MySQL + JWT）
    ============================================ */
 
 const Auth = {
 
   currentUser: null,   // { username } or null
+  API_BASE: 'http://localhost:8000',
 
   /* ======== 初始化 ======== */
   init() {
     // 恢复 session
-    const saved = localStorage.getItem('chef_current_user');
-    if (saved) {
-      try { this.currentUser = JSON.parse(saved); } catch (e) { this.currentUser = null; }
+    const token = localStorage.getItem('chef_token');
+    const username = localStorage.getItem('chef_username');
+    if (token && username) {
+      this.currentUser = { username };
     }
     this._updateUI();
 
@@ -49,9 +51,14 @@ const Auth = {
     return this.currentUser ? this.currentUser.username : null;
   },
 
+  getToken() {
+    return localStorage.getItem('chef_token') || '';
+  },
+
   logout() {
     this.currentUser = null;
-    localStorage.removeItem('chef_current_user');
+    localStorage.removeItem('chef_token');
+    localStorage.removeItem('chef_username');
     this._updateUI();
     if (typeof App !== 'undefined' && App._onLogout) {
       App._onLogout();
@@ -84,17 +91,7 @@ const Auth = {
     document.getElementById('registerError').textContent = '';
   },
 
-  _getUsers() {
-    try {
-      return JSON.parse(localStorage.getItem('chef_users') || '{}');
-    } catch (e) { return {}; }
-  },
-
-  _saveUsers(users) {
-    localStorage.setItem('chef_users', JSON.stringify(users));
-  },
-
-  _login() {
+  async _login() {
     const form = document.getElementById('loginForm');
     const username = form.loginUser.value.trim();
     const password = form.loginPass.value;
@@ -105,29 +102,33 @@ const Auth = {
       return;
     }
 
-    const users = this._getUsers();
-    if (!users[username]) {
-      errorEl.textContent = '用户不存在，请先注册';
-      return;
-    }
-    if (users[username] !== password) {
-      errorEl.textContent = '密码错误';
-      return;
-    }
+    try {
+      const resp = await fetch(`${this.API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        errorEl.textContent = data.detail || '登录失败';
+        return;
+      }
 
-    // 登录成功
-    this.currentUser = { username };
-    localStorage.setItem('chef_current_user', JSON.stringify(this.currentUser));
-    this._updateUI();
-    this.closeModal();
+      this.currentUser = { username: data.username };
+      localStorage.setItem('chef_token', data.access_token);
+      localStorage.setItem('chef_username', data.username);
+      this._updateUI();
+      this.closeModal();
 
-    // 同步用户对话
-    if (typeof App !== 'undefined' && App._onLogin) {
-      App._onLogin(username);
+      if (typeof App !== 'undefined' && App._onLogin) {
+        App._onLogin(data.username);
+      }
+    } catch (e) {
+      errorEl.textContent = '网络错误，请检查后端是否启动';
     }
   },
 
-  _register() {
+  async _register() {
     const form = document.getElementById('registerForm');
     const username = form.regUser.value.trim();
     const password = form.regPass.value;
@@ -151,23 +152,29 @@ const Auth = {
       return;
     }
 
-    const users = this._getUsers();
-    if (users[username]) {
-      errorEl.textContent = '用户名已存在，请直接登录';
-      return;
-    }
+    try {
+      const resp = await fetch(`${this.API_BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        errorEl.textContent = data.detail || '注册失败';
+        return;
+      }
 
-    // 注册成功
-    users[username] = password;
-    this._saveUsers(users);
-    this.currentUser = { username };
-    localStorage.setItem('chef_current_user', JSON.stringify(this.currentUser));
-    this._updateUI();
-    this.closeModal();
+      this.currentUser = { username: data.username };
+      localStorage.setItem('chef_token', data.access_token);
+      localStorage.setItem('chef_username', data.username);
+      this._updateUI();
+      this.closeModal();
 
-    // 同步用户对话
-    if (typeof App !== 'undefined' && App._onLogin) {
-      App._onLogin(username);
+      if (typeof App !== 'undefined' && App._onLogin) {
+        App._onLogin(data.username);
+      }
+    } catch (e) {
+      errorEl.textContent = '网络错误，请检查后端是否启动';
     }
   },
 

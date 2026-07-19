@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from schemas import RecommendRequest, RecommendationResponse
 from graph import recommend as run_recommend
+from routers.auth import router as auth_router
+import database
 
 
 @asynccontextmanager
@@ -14,7 +16,9 @@ async def lifespan(app: FastAPI):
     # 启动时预编译 graph
     from graph import get_graph
     get_graph()
+    await database.init_pool()
     yield
+    await database.close_pool()
 
 
 app = FastAPI(
@@ -32,6 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 路由
+app.include_router(auth_router)
 
 
 # ============================================================

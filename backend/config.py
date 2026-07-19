@@ -32,3 +32,18 @@ TOTAL_TIMEOUT_SEC: int = 15
 BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
 KNOWLEDGE_BASE_DIR: str = os.path.join(BASE_DIR, "..", "knowledge-base", "recipes")
 DATA_DIR: str = os.path.join(BASE_DIR, "..", "data")
+
+# ============================================================
+# MySQL 数据库 —— 修改下面这行，填你的真实密码
+# ============================================================
+DATABASE_URL: str = os.getenv(
+    "DATABASE_URL",
+    "mysql://root:specialone27@127.0.0.1:3306/chef"
+)
+
+# ============================================================
+# JWT
+# ============================================================
+JWT_SECRET: str = os.getenv("JWT_SECRET", "chef-dev-secret-change-in-production")
+JWT_ALGORITHM: str = "HS256"
+JWT_EXPIRE_HOURS: int = 72
