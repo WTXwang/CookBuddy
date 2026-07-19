@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今晚吃什么 🍳</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/chef.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ========== 侧边栏 ========== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <button class="sidebar-new-chat" id="newChatBtn">
+        <span class="new-chat-icon">🍳</span>
+        <span>新对话</span>
+      </button>
+    </div>
+
+    <nav class="sidebar-history" id="historyList">
+      <!-- JS 动态填充 -->
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-toggle-btn" id="sidebarToggle" title="收起侧边栏">
+        <span class="toggle-icon">◀</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ========== 侧边栏遮罩（移动端） ========== -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ========== 侧边栏展开按钮（桌面端折叠后显示） ========== -->
+  <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="展开侧边栏">▶</button>
+
+  <!-- ========== 主内容区 ========== -->
+  <div class="main-wrap">
+
+    <!-- 顶部栏（仅移动端显示菜单按钮） -->
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" title="菜单">
+        <span>☰</span>
+      </button>
+      <span class="topbar-brand">🍳 今晚吃什么</span>
+    </header>
+
+    <!-- 对话区 -->
+    <main class="chat-area" id="chatArea">
+
+      <div class="empty-state" id="emptyState">
+        <div class="empty-illustration">🍳</div>
+        <h1 class="empty-title">今晚吃什么？</h1>
+        <p class="empty-hint">告诉我你手头有什么食材，我帮你搭配成菜</p>
+        <div class="example-list">
+          <button class="example-card" data-example="鸡蛋、番茄、土豆、青菜，两个人，20分钟，不辣">
+            <span class="example-icon">🍅</span>
+            <span class="example-text">鸡蛋番茄怎么吃</span>
+            <span class="example-sub">经典家常搭配</span>
+          </button>
+          <button class="example-card" data-example="豆腐、青菜、鸡蛋，素食，15分钟，只用炒锅">
+            <span class="example-icon">🥬</span>
+            <span class="example-text">素食快速汤</span>
+            <span class="example-sub">15分钟搞定</span>
+          </button>
+          <button class="example-card" data-example="土豆、胡萝卜、鸡胸肉，30分钟，不辣">
+            <span class="example-icon">🥔</span>
+            <span class="example-text">土豆鸡肉不辣</span>
+            <span class="example-sub">营养均衡</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="messages" id="messages"></div>
+
+    </main>
+
+    <!-- 输入区 -->
+    <footer class="input-area" id="inputArea">
+      <div class="input-card">
+        <div class="input-row">
+          <textarea
+            id="ingredientInput"
+            class="ingredient-input"
+            placeholder="输入你手头的食材，例如：鸡蛋、番茄、土豆..."
+            rows="1"
+            autofocus
+          ></textarea>
+          <button class="send-btn" id="sendBtn" title="开始烹饪">🍳</button>
+        </div>
+        <div class="constraint-row">
+          <div class="constraint-scroll">
+            <button class="chip active" data-key="servings" data-val="2">👥 2人</button>
+            <button class="chip" data-key="servings" data-val="1">1人</button>
+            <button class="chip" data-key="servings" data-val="4">4人</button>
+            <span class="chip-sep"></span>
+            <button class="chip active" data-key="time_limit_min" data-val="20">⏱ 20分钟</button>
+            <button class="chip" data-key="time_limit_min" data-val="15">15分钟</button>
+            <button class="chip" data-key="time_limit_min" data-val="30">30分钟</button>
+            <button class="chip" data-key="time_limit_min" data-val="60">60分钟</button>
+            <span class="chip-sep"></span>
+            <button class="chip active" data-key="difficulty" data-val="简单">📊 简单</button>
+            <button class="chip" data-key="difficulty" data-val="中等">中等</button>
+            <button class="chip" data-key="difficulty" data-val="任意">任意</button>
+            <span class="chip-sep"></span>
+            <button class="chip active" data-key="flavor" data-val="">🌶 不限</button>
+            <button class="chip" data-key="flavor" data-val="不辣">不辣</button>
+            <button class="chip" data-key="flavor" data-val="微辣">微辣</button>
+            <button class="chip" data-key="flavor" data-val="酸甜">酸甜</button>
+          </div>
+        </div>
+        <details class="advanced-toggle">
+          <summary>更多选项：忌口 / 过敏 / 厨具</summary>
+          <div class="advanced-row">
+            <input type="text" id="excludedInput" placeholder="忌口，如：香菜、花椒" class="tag-input">
+            <input type="text" id="allergenInput" placeholder="过敏，如：花生、虾" class="tag-input">
+            <input type="text" id="equipmentInput" placeholder="厨具，如：炒锅、电饭煲" class="tag-input">
+          </div>
+        </details>
+      </div>
+    </footer>
+
+  </div><!-- /main-wrap -->
+</div><!-- /app-layout -->
+
+<!-- ========== 模板 ========== -->
+<template id="recipeCardTemplate">
+  <div class="recipe-card">
+    <div class="card-img-wrap">
+      <img class="card-img" src="" alt="" loading="lazy">
+      <div class="card-img-placeholder">🥘</div>
+      <span class="card-match-badge"></span>
+    </div>
+    <div class="card-body">
+      <h3 class="card-title"></h3>
+      <div class="card-meta">
+        <span class="meta-time"></span>
+        <span class="meta-diff"></span>
+        <span class="meta-servings"></span>
+      </div>
+      <div class="card-ingredients">
+        <div class="ingredient-tags used"></div>
+        <div class="ingredient-tags missing"></div>
+      </div>
+      <p class="card-reason"></p>
+      <details class="card-details">
+        <summary>📋 查看做法与步骤</summary>
+        <div class="card-prep"></div>
+        <ol class="card-steps"></ol>
+        <div class="card-safety"></div>
+      </details>
+    </div>
+  </div>
+</template>
+
+<script src="js/mock.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
