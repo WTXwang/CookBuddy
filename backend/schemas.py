@@ -45,6 +45,18 @@ class RecommendRequest(BaseModel):
     equipment: list[str] = Field(default_factory=list)
 
 
+class UserRequest(BaseModel):
+    """B → A 统一数据契约 —— 8 字段，B 只拆词，A 负责标准化和匹配"""
+    ingredients: list[str] = Field(default_factory=list, description="食材名称列表（B只分词不标准化，A负责别名映射）")
+    excluded: list[str] = Field(default_factory=list, description="忌口食材")
+    allergens: list[str] = Field(default_factory=list, description="过敏原")
+    equipment: list[str] = Field(default_factory=list, description="可用厨具")
+    servings: int = Field(default=2, ge=1, le=20, description="用餐人数")
+    difficulty: str = Field(default="任意", description="难度要求：任意/简单/中等/困难")
+    time_limit_min: int = Field(default=30, ge=1, le=480, description="时间限制（分钟）")
+    flavor: str = Field(default="", description="口味偏好，如：不辣、清淡、重口味")
+
+
 # ============================================================
 # Knowledge Base / Recipe
 # ============================================================
