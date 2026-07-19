@@ -145,6 +145,19 @@ Final   = clamp(Base-Penalty, 0, 100)
 
 ---
 
+## 已知问题
+
+RAGFlow 接入已跑通（`POST /api/v1/retrieval`），但**暂不完善**：
+
+| 问题 | 说明 |
+|---|---|
+| **菜谱缺少结构化元数据** | RAGFlow 知识库中的菜谱为纯 markdown（无 YAML 头部），`core_ingredients`、`difficulty`、`equipment`、`allergens`、`estimated_time_min` 等字段无法从 chunk 中可靠获取，大部分走默认值 |
+| **当前靠 stub 兜底** | 标题匹配到 stub 种子数据时复用其元数据；未匹配到的菜谱结构化信息质量差 |
+| **食材提取粗糙** | 从 chunk 正文用正则 `- 食材名 数量` 提取，会把非食材行也抓进来，且无法区分核心食材和调料 |
+| **待定方案** | 考虑建本地元数据索引（`recipes_index.json`），RAGFlow 只负责检索排序，元数据从本地取 |
+
+---
+
 ## 测试
 
 ```bash
