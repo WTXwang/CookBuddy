@@ -83,8 +83,9 @@ class CandidateFeature(BaseModel):
     core_matched: int = 0
     missing_core: list[str] = Field(default_factory=list)
     missing_optional: list[str] = Field(default_factory=list)
-    preference_score: float = 0.0      # 0~1 口味/难度匹配度
+    preference_score: float = 0.0      # 0~1 口味匹配度
     time_fit: float = 0.0              # 0~1 时间符合度
+    difficulty_fit: float = 0.0        # 0~1 难度符合度
     equipment_fit: float = 0.0         # 0~1 厨具符合度
     blocked: bool = False
     block_reasons: list[str] = Field(default_factory=list)

@@ -21,14 +21,14 @@ from rules.scorer import build_feature, score_and_rank
 from agents.matcher import RecipeMatcher
 from agents.cooking_guide import CookingGuide
 from agents.safety import FoodSafetyReviewer
-from retrieval.stub import RetrievalStub
+from retrieval import create_retriever
 import config
 
 
 # ============================================================
 # 初始化模块（每个 Agent 独立指定模型）
 # ============================================================
-_retrieval = RetrievalStub()
+_retrieval = create_retriever()
 _matcher = RecipeMatcher(model=config.MATCHER_MODEL)
 _guide = CookingGuide(model=config.GUIDE_MODEL)
 _safety = FoodSafetyReviewer(model=config.SAFETY_MODEL)

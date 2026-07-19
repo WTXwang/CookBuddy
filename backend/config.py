@@ -27,6 +27,16 @@ LLM_TEMPERATURE: float = 0.3
 TOTAL_TIMEOUT_SEC: int = 15
 
 # ============================================================
+# 检索后端 —— "stub" | "ragflow"
+# ============================================================
+RETRIEVAL_BACKEND: str = os.getenv("RETRIEVAL_BACKEND", "stub")
+
+# RAGFlow 配置
+RAGFLOW_HOST: str = os.getenv("RAGFLOW_HOST", "http://127.0.0.1:9380")
+RAGFLOW_API_KEY: str = os.getenv("RAGFLOW_API_KEY", "ragflow-M1btZ5ircgt4Lhn6Y0ogEmvmJ2SIxZmcpEdwN7gIskw")
+RAGFLOW_KB_NAME: str = os.getenv("RAGFLOW_KB_NAME", "recipe")
+
+# ============================================================
 # 路径
 # ============================================================
 BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
