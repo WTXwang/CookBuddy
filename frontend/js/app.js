@@ -24,6 +24,9 @@ const App = {
 
   /* ======== 初始化 ======== */
   init() {
+    // 初始化 Auth（登录状态）
+    Auth.init();
+
     this._loadConversations();
     this._renderHistory();
 
@@ -134,27 +137,52 @@ const App = {
     }
   },
 
+  _getStorageKey() {
+    const user = Auth.getUsername();
+    return user ? 'chef_conv_' + user : 'chef_conversations';
+  },
+
   _saveConversations() {
-    // 只保存最近 50 条对话，每条最多存 20 条消息
     const toSave = this.conversations.slice(0, 50).map(c => ({
       ...c,
       messages: (c.messages || []).slice(-20)
     }));
     try {
-      localStorage.setItem('chef_conversations', JSON.stringify(toSave));
+      localStorage.setItem(this._getStorageKey(), JSON.stringify(toSave));
     } catch (e) {
-      // localStorage 满了就清掉旧的
       const half = toSave.slice(0, 25);
-      localStorage.setItem('chef_conversations', JSON.stringify(half));
+      localStorage.setItem(this._getStorageKey(), JSON.stringify(half));
     }
   },
 
   _loadConversations() {
     try {
-      const raw = localStorage.getItem('chef_conversations');
+      const raw = localStorage.getItem(this._getStorageKey());
       if (raw) this.conversations = JSON.parse(raw);
     } catch (e) {
       this.conversations = [];
+    }
+  },
+
+  /** 登录后重载该用户的对话 */
+  _onLogin(username) {
+    this._loadConversations();
+    this._renderHistory();
+    if (this.conversations.length > 0) {
+      this._loadConversation(this.conversations[0].id);
+    } else {
+      this._newConversation();
+    }
+  },
+
+  /** 登出后回到匿名对话 */
+  _onLogout() {
+    this._loadConversations();
+    this._renderHistory();
+    if (this.conversations.length > 0) {
+      this._loadConversation(this.conversations[0].id);
+    } else {
+      this._newConversation();
     }
   },
 

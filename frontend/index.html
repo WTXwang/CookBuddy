@@ -40,12 +40,15 @@
   <!-- ========== 主内容区 ========== -->
   <div class="main-wrap">
 
-    <!-- 顶部栏（仅移动端显示菜单按钮） -->
+    <!-- 顶部栏 -->
     <header class="topbar">
-      <button class="menu-btn" id="menuBtn" title="菜单">
-        <span>☰</span>
-      </button>
+      <button class="menu-btn" id="menuBtn" title="菜单">☰</button>
       <span class="topbar-brand">🍳 今晚吃什么</span>
+      <div class="topbar-spacer"></div>
+      <button class="login-btn" id="loginBtn" title="登录">
+        <span class="login-btn-icon">👤</span>
+        <span class="login-btn-text">登录</span>
+      </button>
     </header>
 
     <!-- 对话区 -->
@@ -126,6 +129,51 @@
   </div><!-- /main-wrap -->
 </div><!-- /app-layout -->
 
+<!-- ========== 登录/注册模态框 ========== -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal-card">
+    <button class="modal-close" id="authModalClose">&times;</button>
+
+    <!-- Tab 切换 -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">登录</button>
+      <button class="auth-tab" data-tab="register">注册</button>
+    </div>
+
+    <!-- 登录表单 -->
+    <form class="auth-form" id="loginForm">
+      <div class="auth-field">
+        <label>用户名</label>
+        <input type="text" name="loginUser" placeholder="请输入用户名" required autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input type="password" name="loginPass" placeholder="请输入密码" required autocomplete="current-password">
+      </div>
+      <p class="auth-error" id="loginError"></p>
+      <button type="submit" class="auth-submit">登 录</button>
+    </form>
+
+    <!-- 注册表单（默认隐藏） -->
+    <form class="auth-form hidden" id="registerForm">
+      <div class="auth-field">
+        <label>用户名</label>
+        <input type="text" name="regUser" placeholder="4~16位字母或中文" required minlength="2" maxlength="16" autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input type="password" name="regPass" placeholder="至少6位" required minlength="6" autocomplete="new-password">
+      </div>
+      <div class="auth-field">
+        <label>确认密码</label>
+        <input type="password" name="regPass2" placeholder="再次输入密码" required minlength="6" autocomplete="new-password">
+      </div>
+      <p class="auth-error" id="registerError"></p>
+      <button type="submit" class="auth-submit">注 册</button>
+    </form>
+  </div>
+</div>
+
 <!-- ========== 模板 ========== -->
 <template id="recipeCardTemplate">
   <div class="recipe-card">
@@ -158,6 +206,7 @@
 
 <script src="js/mock.js"></script>
 <script src="js/renderer.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
