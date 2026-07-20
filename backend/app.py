@@ -54,9 +54,7 @@ async def health():
 @app.post("/api/recommend")
 async def api_recommend(req: RecommendRequest):
     """
-    推荐接口 —— 用户提供食材文本和约束，返回菜谱推荐。
-
-    响应结构见 schemas.RecommendationResponse。
+    统一入口 —— 闲聊或推荐。Concierge 判断意图后路由。
     """
     if not req.ingredients_text.strip():
         raise HTTPException(status_code=422, detail="请至少提供一种现有食材")
@@ -66,6 +64,10 @@ async def api_recommend(req: RecommendRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"推荐流程异常: {str(e)}")
 
+    # 闲聊模式：直接返回对话回复
+    if state.intent == "chat" and state.chat_reply:
+        return {"reply": state.chat_reply, "intent": "chat"}
+
     if state.error and not state.response:
         raise HTTPException(status_code=422, detail=state.error)
 
@@ -73,9 +75,13 @@ async def api_recommend(req: RecommendRequest):
         return RecommendationResponse(
             request_summary=state.response.request_summary if state.response else None,
             recommendations=[],
-            follow_up_question="没有找到完全匹配的菜谱，试试放宽条件或补充食材？",
+            follow_up_question=state.chat_reply or "没有找到完全匹配的菜谱，试试放宽条件或补充食材？",
             trace_id=state.request.request_id if state.request else "",
         )
+
+    # 推荐成功时也带上 Concierge 的口头回复
+    if state.chat_reply:
+        state.response.follow_up_question = state.chat_reply
 
     return state.response
 

@@ -45,6 +45,18 @@ class RecommendRequest(BaseModel):
     equipment: list[str] = Field(default_factory=list)
 
 
+class UserRequest(BaseModel):
+    """B → A 统一数据契约 —— 8 字段，B 只拆词，A 负责标准化和匹配"""
+    ingredients: list[str] = Field(default_factory=list, description="食材名称列表（B只分词不标准化，A负责别名映射）")
+    excluded: list[str] = Field(default_factory=list, description="忌口食材")
+    allergens: list[str] = Field(default_factory=list, description="过敏原")
+    equipment: list[str] = Field(default_factory=list, description="可用厨具")
+    servings: int = Field(default=2, ge=1, le=20, description="用餐人数")
+    difficulty: str = Field(default="任意", description="难度要求：任意/简单/中等/困难")
+    time_limit_min: int = Field(default=30, ge=1, le=480, description="时间限制（分钟）")
+    flavor: str = Field(default="", description="口味偏好，如：不辣、清淡、重口味")
+
+
 # ============================================================
 # Knowledge Base / Recipe
 # ============================================================
@@ -144,7 +156,8 @@ class RecommendationResponse(BaseModel):
 # ============================================================
 
 class Intent(str, Enum):
-    RECOMMEND = "recommend"
+    CHAT = "chat"              # 闲聊/问候
+    RECOMMEND = "recommend"    # 推荐菜谱
     LOOKUP = "lookup"          # 按菜名查做法
     SUBSTITUTE = "substitute"  # 找替代食材
     OTHER = "other"            # 超出能力范围
@@ -155,6 +168,8 @@ class GraphStage(str, Enum):
     INIT = "init"
     NORMALIZE = "normalize"
     CATEGORIZE = "categorize"
+    CONCIERGE = "concierge"
+    LOOKUP = "lookup"
     RETRIEVE = "retrieve"
     MATCH = "match"
     SCORE = "score"
@@ -179,6 +194,7 @@ class ChefState(BaseModel):
 
     # 输出
     response: Optional[RecommendationResponse] = None
+    chat_reply: str = ""                    # Concierge 闲聊回复（intent=chat 时用）
 
     # 流程控制
     stage: GraphStage = GraphStage.INIT
@@ -187,6 +203,7 @@ class ChefState(BaseModel):
     stage_durations: dict = Field(default_factory=dict)
 
     # 用户约束（从 request 展开供各节点使用）
+    raw_ingredients: list[str] = Field(default_factory=list)  # Concierge 提取的食材名称（未标准化）
     user_allergens: list[str] = Field(default_factory=list)
     user_excluded: list[str] = Field(default_factory=list)
     user_equipment: list[str] = Field(default_factory=list)

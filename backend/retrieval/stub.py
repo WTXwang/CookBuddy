@@ -179,7 +179,7 @@ class RetrievalStub(BaseRetriever):
                     score += 2.0
 
             if score > 0:
-                r.retrieval_score = min(1.0, score / 10.0)  # 归一化到 0~1
+                r.retrieval_score = min(1.0, score / 10.0)
                 scored.append(r)
 
         scored.sort(key=lambda r: r.retrieval_score, reverse=True)
