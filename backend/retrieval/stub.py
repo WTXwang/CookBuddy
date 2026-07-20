@@ -151,7 +151,6 @@ class RetrievalStub:
             core = set(r.core_ingredients)
             optional = set(r.optional_ingredients)
             seasons = set(r.seasonings)
-            # 命中：核心食材 3 分，可选 1 分，调料 0.5 分（不计入基础调料）
             score = 0.0
             for ing in ing_set:
                 if ing in core:
@@ -160,7 +159,6 @@ class RetrievalStub:
                     score += 1.0
                 elif ing in seasons:
                     score += 0.5
-                # 部分匹配（子串）
                 else:
                     for core_ing in core:
                         if ing in core_ing or core_ing in ing:
@@ -172,9 +170,21 @@ class RetrievalStub:
                             break
 
             if score > 0:
-                r.retrieval_score = min(1.0, score / 10.0)  # 归一化到 0~1
+                r.retrieval_score = min(1.0, score / 10.0)
                 scored.append(r)
 
-        # 按检索分排序，取 Top N
         scored.sort(key=lambda r: r.retrieval_score, reverse=True)
         return scored[:top_n]
+
+    def lookup_by_title(self, query: str) -> RecipeRecord | None:
+        """精确查找：按菜名匹配（支持模糊包含匹配）"""
+        query_lower = query.strip().lower()
+        # 精确匹配
+        for r in self.recipes:
+            if r.title.lower() == query_lower:
+                return r
+        # 包含匹配："番茄炒蛋怎么做" → 匹配"番茄炒蛋"
+        for r in self.recipes:
+            if r.title.lower() in query_lower or query_lower in r.title.lower():
+                return r
+        return None

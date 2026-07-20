@@ -1,8 +1,8 @@
-"""LangGraph 主控流程 —— ChefCoordinator
+"""LangGraph 主控流程 —— Concierge 总控，三条分支
 
-节点顺序（对齐计划书 7.1）：
-  Begin → Categorize → Normalize → Retrieve → Match
-  → Score → Guide → Safety → Output
+  Concierge ─┬─ chat ──────────────────────────→ Output
+              ├─ recommend → Parser → Normalize → Retrieve → Match → Score → Guide → Safety → Output
+              └─ lookup ──────────────────────→ Retrieve → Match → Score → Guide → Safety → Output
 """
 
 import time
@@ -18,9 +18,10 @@ from schemas import (
 from rules.normalizer import normalize_ingredients
 from rules.staples import get_staples
 from rules.scorer import build_feature, score_and_rank
-from agents.matcher import RecipeMatcher
 from agents.cooking_guide import CookingGuide
 from agents.safety import FoodSafetyReviewer
+from agents.concierge import concierge_chat
+from agents.parser import parse_to_user_request
 from retrieval.stub import RetrievalStub
 import config
 
@@ -29,7 +30,6 @@ import config
 # 初始化模块（每个 Agent 独立指定模型）
 # ============================================================
 _retrieval = RetrievalStub()
-_matcher = RecipeMatcher(model=config.MATCHER_MODEL)
 _guide = CookingGuide(model=config.GUIDE_MODEL)
 _safety = FoodSafetyReviewer(model=config.SAFETY_MODEL)
 
@@ -37,11 +37,6 @@ _safety = FoodSafetyReviewer(model=config.SAFETY_MODEL)
 def set_retrieval(r):
     global _retrieval
     _retrieval = r
-
-
-def set_matcher(m):
-    global _matcher
-    _matcher = m
 
 
 def set_guide(g):
@@ -71,54 +66,85 @@ def _lap(state: ChefState, key: str):
     state.stage_durations[key] = round((now - start) * 1000)  # ms
 
 
-def node_categorize(state: ChefState) -> ChefState:
-    """意图分类：推荐 / 查做法 / 找替代 / 其他"""
-    _timer(state, 'categorize')
-    state.stage = GraphStage.CATEGORIZE
+async def node_concierge(state: ChefState) -> ChefState:
+    """对话门面 + 意图路由（只分类，不提取字段）"""
+    _timer(state, 'concierge')
+    state.stage = GraphStage.CONCIERGE
 
     text = state.raw_input.strip()
     if not text:
         state.intent = Intent.OTHER
-        state.error = "未输入食材"
+        state.chat_reply = "你好像还没说话呢～告诉我你有什么食材，我帮你搭配！"
         state.stage = GraphStage.ERROR
-        _lap(state, 'categorize')
+        _lap(state, 'concierge')
         return state
 
-    # 简单关键词分类（MVP，后续用 LLM）
-    if any(kw in text for kw in ["怎么做", "做法", "步骤", "怎么烧"]):
-        state.intent = Intent.LOOKUP
-    elif any(kw in text for kw in ["替代", "代替", "换成", "没有"]):
-        state.intent = Intent.SUBSTITUTE
-    else:
-        state.intent = Intent.RECOMMEND
+    result = await concierge_chat(user_text=text)
+    state.intent = result.intent
+    state.chat_reply = result.reply
 
-    _lap(state, 'categorize')
+    _lap(state, 'concierge')
+    return state
+
+
+async def node_parser(state: ChefState) -> ChefState:
+    """Parser：LLM 提取 8 字段 → UserRequest"""
+    _timer(state, 'parser')
+    state.stage = GraphStage.CONCIERGE
+
+    req = state.request
+    user_req = await parse_to_user_request(
+        ingredients_text=state.raw_input,
+        servings=req.servings if req else 2,
+        time_limit_min=req.time_limit_min if req else 30,
+        difficulty=req.difficulty if req else "任意",
+        flavor=req.flavor if req else "",
+        excluded=req.excluded_ingredients if req else [],
+        allergens=req.allergens if req else [],
+        equipment=req.equipment if req else [],
+    )
+
+    state.raw_ingredients = user_req.ingredients
+    state.user_allergens = user_req.allergens
+    state.user_excluded = user_req.excluded
+    state.user_equipment = user_req.equipment
+    state.user_servings = user_req.servings
+    state.user_flavor = user_req.flavor
+    state.user_time_limit = user_req.time_limit_min
+
+    _lap(state, 'parser')
+    return state
+
+
+def node_lookup(state: ChefState) -> ChefState:
+    """教学线：把菜名传给后端，提示走直接检索"""
+    _timer(state, 'lookup')
+    state.stage = GraphStage.LOOKUP
+
+    # 从输入中提取菜名（去除"怎么做"等提问词）
+    import re
+    dish_name = re.sub(r'怎么做|做法|步骤|怎么烧|教我做|有没有|的家常做法|的菜谱', '', state.raw_input).strip()
+
+    # 把菜名当作食材名传给 A 的检索
+    state.raw_ingredients = [dish_name] if dish_name else [state.raw_input.strip()]
+    state.intent = Intent.LOOKUP
+
+    _lap(state, 'lookup')
     return state
 
 
 def node_normalize(state: ChefState) -> ChefState:
-    """食材标准化：分词、别名映射、去重、基础调料识别"""
+    """食材标准化 + 基础调料识别（A 的 normalizer）"""
     _timer(state, 'normalize')
     state.stage = GraphStage.NORMALIZE
 
-    text = state.raw_input.strip()
-    if not text:
-        state.error = "请输入食材"
+    if not state.raw_ingredients:
+        state.error = "未能识别到食材，请再描述一下你有哪些食材？"
         state.stage = GraphStage.ERROR
         return state
 
-    # 简单分词（按逗号、顿号、空格分割）
-    import re
-    raw_items = re.split(r'[,，、\s]+', text)
-    raw_items = [r.strip() for r in raw_items if r.strip()]
-
-    # 数量词过滤（"半个"、"2个" 等）
-    quantity_pattern = re.compile(r'^[\d半个两三四五六七八九十]+[个只条根片块]?$')
-    raw_items = [r for r in raw_items if not quantity_pattern.match(r)]
-
-    # 标准化
-    normalized = normalize_ingredients(raw_items)
-    ing_names = [n.name for n in normalized]
+    # 标准化（交给 A）
+    normalized = normalize_ingredients(state.raw_ingredients)
 
     # 基础调料
     staples = get_staples(assume=True, include_aromatics=True)
@@ -126,24 +152,16 @@ def node_normalize(state: ChefState) -> ChefState:
     state.request = NormalizedRequest(
         request_id=state.request.request_id if state.request else str(uuid.uuid4()),
         ingredients=normalized,
-        servings=state.request.servings if state.request else 2,
-        time_limit_min=state.request.time_limit_min if state.request else 30,
-        difficulty=state.request.difficulty if state.request else "简单",
-        flavor=state.request.flavor if state.request else "",
-        excluded_ingredients=state.request.excluded_ingredients if state.request else [],
-        allergens=state.request.allergens if state.request else [],
-        equipment=state.request.equipment if state.request else [],
+        servings=state.user_servings,
+        time_limit_min=state.user_time_limit,
+        difficulty=state.request.difficulty if state.request else "任意",
+        flavor=state.user_flavor,
+        excluded_ingredients=state.user_excluded,
+        allergens=state.user_allergens,
+        equipment=state.user_equipment,
         assume_staples=True,
         assumed_staples=staples,
     )
-
-    # 同步约束到 state 顶层
-    state.user_allergens = state.request.allergens
-    state.user_excluded = state.request.excluded_ingredients
-    state.user_equipment = state.request.equipment
-    state.user_flavor = state.request.flavor
-    state.user_time_limit = state.request.time_limit_min
-    state.user_servings = state.request.servings
 
     _lap(state, 'normalize')
     return state
@@ -321,11 +339,18 @@ def node_error(state: ChefState) -> ChefState:
 # 路由函数（条件边）
 # ============================================================
 
-def route_after_categorize(state: ChefState) -> Literal["normalize", "error"]:
-    if state.intent == Intent.RECOMMEND:
-        return "normalize"
-    # 暂不支持 LOOKUP / SUBSTITUTE（MVP 后扩展）
-    return "normalize"
+def route_after_concierge(state: ChefState) -> Literal["parser", "lookup", "output", "error"]:
+    if state.stage == GraphStage.ERROR:
+        return "error"
+    if state.intent == Intent.CHAT:
+        return "output"
+    if state.intent == Intent.LOOKUP:
+        return "lookup"
+    return "parser"
+
+
+def route_after_parser(state: ChefState) -> Literal["normalize", "error"]:
+    return "error" if state.stage == GraphStage.ERROR else "normalize"
 
 
 def route_after_retrieve(state: ChefState) -> Literal["match", "error"]:
@@ -345,7 +370,9 @@ def build_graph() -> StateGraph:
     workflow = StateGraph(ChefState)
 
     # 添加节点
-    workflow.add_node("categorize", node_categorize)
+    workflow.add_node("concierge", node_concierge)
+    workflow.add_node("parser", node_parser)
+    workflow.add_node("lookup", node_lookup)
     workflow.add_node("normalize", node_normalize)
     workflow.add_node("retrieve", node_retrieve)
     workflow.add_node("match", node_match)
@@ -355,15 +382,24 @@ def build_graph() -> StateGraph:
     workflow.add_node("output", node_output)
     workflow.add_node("error", node_error)
 
-    # 设置入口
-    workflow.set_entry_point("categorize")
+    # 入口：Concierge 统一对话门面
+    workflow.set_entry_point("concierge")
 
-    # 添加边
-    workflow.add_conditional_edges("categorize", route_after_categorize, {
+    # ── 三条分支 ──
+    workflow.add_conditional_edges("concierge", route_after_concierge, {
+        "parser": "parser",         # recommend → Parser 提取 8 字段
+        "lookup": "lookup",         # lookup → 教学线，传菜名给 A 检索
+        "output": "output",         # chat → 直接输出对话
+        "error": "error",
+    })
+    # 菜谱线：parser → normalize → retrieve → match → score → guide → safety
+    workflow.add_conditional_edges("parser", route_after_parser, {
         "normalize": "normalize",
         "error": "error",
     })
     workflow.add_edge("normalize", "retrieve")
+    # 教学线：lookup → retrieve（A 负责用菜名精确查找）
+    workflow.add_edge("lookup", "retrieve")
     workflow.add_conditional_edges("retrieve", route_after_retrieve, {
         "match": "match",
         "error": "error",
