@@ -90,7 +90,7 @@ async def api_recommend(req: RecommendRequest):
 async def api_get_recipe(recipe_id: str):
     """查看某道菜的完整信息（P1 MVP 后续）"""
     # 从检索桩中查找
-    from retrieval.stub import SEED_RECIPES
+    from retrieval import SEED_RECIPES
     for r in SEED_RECIPES:
         if r.recipe_id == recipe_id:
             return r.model_dump()

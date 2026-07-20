@@ -22,7 +22,7 @@ from rules.scorer import build_feature, score_and_rank
 from agents.matcher import RecipeMatcher
 from agents.cooking_guide import CookingGuide
 from agents.safety import FoodSafetyReviewer
-from retrieval.stub import RetrievalStub
+from retrieval import create_retriever
 import config
 
 
@@ -114,7 +114,7 @@ async def run_demo():
         safety = FoodSafetyReviewer(model="")
         print(f"  🔧 纯规则模式 (--llm 切换 LLM, 模型在 config.py 配置)")
 
-    retrieval = RetrievalStub()
+    retrieval = create_retriever()
 
     # ─── Step 1: 输入 ───
     step_banner(1, "Categorize 意图分类", "🎯")

@@ -20,16 +20,25 @@ from rules.staples import get_staples
 from rules.scorer import build_feature, score_and_rank
 from agents.cooking_guide import CookingGuide
 from agents.safety import FoodSafetyReviewer
+<<<<<<< HEAD
 from agents.concierge import concierge_chat
 from agents.parser import parse_to_user_request
 from retrieval.stub import RetrievalStub
+=======
+from retrieval import create_retriever
+>>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
 import config
 
 
 # ============================================================
 # 初始化模块（每个 Agent 独立指定模型）
 # ============================================================
+<<<<<<< HEAD
 _retrieval = RetrievalStub()
+=======
+_retrieval = create_retriever()
+_matcher = RecipeMatcher(model=config.MATCHER_MODEL)
+>>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
 _guide = CookingGuide(model=config.GUIDE_MODEL)
 _safety = FoodSafetyReviewer(model=config.SAFETY_MODEL)
 

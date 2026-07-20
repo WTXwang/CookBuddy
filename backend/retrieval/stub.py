@@ -1,7 +1,9 @@
-"""检索桩 —— 模拟 RAGFlow 知识库检索，后续替换为真实实现"""
+"""检索桩 —— 模拟知识库检索，后续由 RAGFlow 替代"""
 
-from typing import List
+from typing import List, Optional
 from schemas import RecipeRecord
+from .base import BaseRetriever
+
 
 # ============================================================
 # 内置种子菜谱（MVP 阶段 mock 用，后续由真实知识库替代）
@@ -131,34 +133,51 @@ SEED_RECIPES: List[RecipeRecord] = [
 ]
 
 
-class RetrievalStub:
+class RetrievalStub(BaseRetriever):
     """
-    模拟 RAGFlow 知识库检索。
-    后续替换为真实 LanceDB/向量检索。
+    基于关键词匹配的模拟检索。
+
+    策略（精确匹配，不做子串匹配避免误匹配）：
+    - 核心食材命中：+3 分
+    - 可选食材命中：+1 分
+    - 调料命中：+0.5 分
+    - 标题关键词命中：+2 分
+
+    得分归一化到 0~1，按检索分降序返回 top_n。
     """
 
     def __init__(self, recipes: List[RecipeRecord] | None = None):
-        self.recipes = recipes or SEED_RECIPES
+        self.recipes = recipes or list(SEED_RECIPES)  # list() 避免共享引用
+
+    # ── BaseRetriever 接口实现 ──────────────────────────
 
     def search(self, ingredients: List[str], top_n: int = 10) -> List[RecipeRecord]:
-        """
-        基于食材关键词匹配召回候选菜谱。
-        简单策略：统计核心食材命中数，命中越多得分越高。
-        """
+        """精确关键词匹配召回候选菜谱"""
         ing_set = set(ingredients)
         scored = []
+
         for r in self.recipes:
             core = set(r.core_ingredients)
             optional = set(r.optional_ingredients)
             seasons = set(r.seasonings)
+<<<<<<< HEAD
+=======
+            title_words = set(r.title)
+
+>>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
             score = 0.0
+
             for ing in ing_set:
+                # 核心食材精确命中
                 if ing in core:
                     score += 3.0
+                # 可选食材精确命中
                 elif ing in optional:
                     score += 1.0
+                # 调料精确命中
                 elif ing in seasons:
                     score += 0.5
+<<<<<<< HEAD
                 else:
                     for core_ing in core:
                         if ing in core_ing or core_ing in ing:
@@ -168,6 +187,11 @@ class RetrievalStub:
                         if ing in opt_ing or opt_ing in ing:
                             score += 0.3
                             break
+=======
+                # 标题关键词命中（单字不算，避免误匹配）
+                elif len(ing) >= 2 and ing in title_words:
+                    score += 2.0
+>>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
 
             if score > 0:
                 r.retrieval_score = min(1.0, score / 10.0)
@@ -176,6 +200,7 @@ class RetrievalStub:
         scored.sort(key=lambda r: r.retrieval_score, reverse=True)
         return scored[:top_n]
 
+<<<<<<< HEAD
     def lookup_by_title(self, query: str) -> RecipeRecord | None:
         """精确查找：按菜名匹配（支持模糊包含匹配）"""
         query_lower = query.strip().lower()
@@ -186,5 +211,11 @@ class RetrievalStub:
         # 包含匹配："番茄炒蛋怎么做" → 匹配"番茄炒蛋"
         for r in self.recipes:
             if r.title.lower() in query_lower or query_lower in r.title.lower():
+=======
+    def get_by_id(self, recipe_id: str) -> Optional[RecipeRecord]:
+        """按 ID 查单道菜谱"""
+        for r in self.recipes:
+            if r.recipe_id == recipe_id:
+>>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
                 return r
         return None
