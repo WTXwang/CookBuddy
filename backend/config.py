@@ -18,6 +18,7 @@ PARSER_MODEL: str = os.getenv("CHEF_PARSER_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 CONCIERGE_MODEL: str = os.getenv("CHEF_CONCIERGE_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 VISION_MODEL: str = os.getenv("CHEF_VISION_MODEL", "Qwen/Qwen2.5-VL-72B-Instruct")
 EMBEDDING_MODEL: str = os.getenv("CHEF_EMBEDDING_MODEL", "BAAI/bge-m3")
+EXTRACTOR_MODEL: str = os.getenv("CHEF_EXTRACTOR_MODEL", "deepseek-ai/DeepSeek-V4-Flash")
 
 # ============================================================
 # 推荐流程参数

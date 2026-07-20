@@ -240,6 +240,42 @@ class RAGFlowRetriever(BaseRetriever):
 
     # ── BaseRetriever 接口 ────────────────────────────────
 
+    def search_ids(self, ingredients: List[str], top_n: int = 10) -> List[tuple[str, float]]:
+        """
+        返回 [(recipe_id, score), ...]，不解析完整 RecipeRecord。
+        recipe_id = document_keyword 去掉 .md 后缀。
+        """
+        if not self._available:
+            return self._stub.search_ids(ingredients, top_n)
+
+        query = " ".join(ingredients)
+        try:
+            chunks = self._retrieve(query, top_n)
+        except Exception as e:
+            print(f"[RAGFlow] 检索异常: {e}，降级到 stub")
+            return self._stub.search_ids(ingredients, top_n)
+
+        if not chunks:
+            print(f"[RAGFlow] 无结果，降级到 stub")
+            return self._stub.search_ids(ingredients, top_n)
+
+        # 按文档分组，取最高相似度
+        doc_scores: dict[str, float] = {}
+        for chunk in chunks:
+            doc_key = chunk.get("document_keyword", chunk.get("docnm_kwd", ""))
+            if not doc_key:
+                continue
+            rid = doc_key.replace(".md", "").strip()
+            if not rid:
+                continue
+            sim = chunk.get("similarity", chunk.get("vector_similarity", 0.0))
+            doc_scores[rid] = max(doc_scores.get(rid, 0.0), float(sim))
+
+        result = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+        print(f"[RAGFlow] '{query}' → {len(result)} 个文档: "
+              f"{[(r[0], round(r[1], 2)) for r in result[:5]]}")
+        return result[:top_n]
+
     def search(self, ingredients: List[str], top_n: int = 10) -> List[RecipeRecord]:
         if not self._available:
             return self._stub.search(ingredients, top_n)
@@ -268,6 +304,13 @@ class RAGFlowRetriever(BaseRetriever):
         print(f"[RAGFlow] '{query}' → {len(result)} 道菜: "
               f"{[(r.title, round(r.retrieval_score, 2)) for r in result[:5]]}")
         return result
+
+    def get_full_text(self, recipe_id: str) -> str | None:
+        """从 RAGFlow 获取菜谱文档全文（拼接所有 chunks）"""
+        chunks = self._retrieve(recipe_id, top_n=30)
+        if not chunks:
+            return None
+        return "\n".join(c.get("content", "") for c in chunks if c.get("content"))
 
     def get_by_id(self, recipe_id: str) -> Optional[RecipeRecord]:
         if not self._available:
