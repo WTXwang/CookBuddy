@@ -285,6 +285,18 @@ EQUIPMENT_KEYWORDS = {
     "平底锅": ["平底锅", "煎锅", "平底煎锅"],
 }
 
+# 厨具名标准化（从 EQUIPMENT_KEYWORDS 反向构建）
+_EQUIP_NORMALIZE: Dict[str, str] = {}
+for _std_name, _aliases in EQUIPMENT_KEYWORDS.items():
+    for _a in _aliases:
+        _EQUIP_NORMALIZE[_a] = _std_name
+
+
+def normalize_equipment(name: str) -> str:
+    """将厨具别名映射为标准名，如 '不粘锅' → '炒锅'"""
+    return _EQUIP_NORMALIZE.get(name.strip(), name.strip())
+
+
 # 过敏原关键词
 ALLERGEN_KEYWORDS = {
     "花生": ["花生过敏", "不能吃花生", "花生不耐受"],

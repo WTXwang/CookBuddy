@@ -27,6 +27,20 @@ class BaseRetriever(ABC):
         ...
 
     @abstractmethod
+    def search_ids(self, ingredients: List[str], top_n: int = 10) -> List[tuple[str, float]]:
+        """
+        输入食材名列表，返回候选菜谱 ID + 检索分。
+
+        Returns:
+            [(recipe_id, score), ...] 按 score 降序
+        """
+        ...
+
+    def get_full_text(self, recipe_id: str) -> str | None:
+        """获取菜谱全文。默认返回 None（stub 不支持）"""
+        return None
+
+    @abstractmethod
     def get_by_id(self, recipe_id: str) -> Optional[RecipeRecord]:
         """
         按 recipe_id 查单道菜谱。

@@ -185,6 +185,11 @@ class RetrievalStub(BaseRetriever):
         scored.sort(key=lambda r: r.retrieval_score, reverse=True)
         return scored[:top_n]
 
+    def search_ids(self, ingredients: List[str], top_n: int = 10) -> List[tuple[str, float]]:
+        """返回 [(recipe_id, score), ...]"""
+        candidates = self.search(ingredients, top_n)
+        return [(r.recipe_id, r.retrieval_score) for r in candidates]
+
     def get_by_id(self, recipe_id: str) -> Optional[RecipeRecord]:
         """按 ID 查单道菜谱"""
         for r in self.recipes:

@@ -17,6 +17,7 @@ GUIDE_MODEL: str = os.getenv("CHEF_GUIDE_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 SAFETY_MODEL: str = os.getenv("CHEF_SAFETY_MODEL", "Qwen/Qwen2.5-72B-Instruct")
 VISION_MODEL: str = os.getenv("CHEF_VISION_MODEL", "Qwen/Qwen2.5-VL-72B-Instruct")
 EMBEDDING_MODEL: str = os.getenv("CHEF_EMBEDDING_MODEL", "BAAI/bge-m3")
+EXTRACTOR_MODEL: str = os.getenv("CHEF_EXTRACTOR_MODEL", "deepseek-ai/DeepSeek-V4-Flash")
 
 # ============================================================
 # 推荐流程参数
