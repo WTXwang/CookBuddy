@@ -1,7 +1,8 @@
 .claude/
 cleaned_data/
-__pycache__/
-agents/__pycache__/
-rules/__pycache__/
-retrieval/__pycache__/
-test_demo.py 
+**/__pycache__/
+*.pyc
+.pytest_cache/
+backend/data/
+*.db
+.env
