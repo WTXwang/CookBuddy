@@ -6,3 +6,4 @@ cleaned_data/
 backend/data/
 *.db
 .env
+new_howtocook
