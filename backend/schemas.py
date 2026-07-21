@@ -213,3 +213,37 @@ class ChefState(BaseModel):
     user_flavor: str = ""
     user_time_limit: int = 30
     user_servings: int = 2
+
+
+# ============================================================
+# User Profile
+# ============================================================
+
+class UserPreferences(BaseModel):
+    """口味和烹饪偏好"""
+    flavor: list[str] = Field(default_factory=list, description="口味偏好，如 ['辣', '清淡']")
+    difficulty: str = Field(default="任意", description="默认难度：任意/简单/中等/困难")
+    time_limit_min: int = Field(default=30, ge=1, le=480, description="默认烹饪时长上限（分钟）")
+    servings: int = Field(default=2, ge=1, le=20, description="默认用餐人数")
+
+
+class UserStats(BaseModel):
+    """历史推荐统计"""
+    favorite_cuisines: dict[str, int] = Field(
+        default_factory=dict, description="菜系计数，如 {'川菜': 5, '家常菜': 12}"
+    )
+    frequent_ingredients: dict[str, int] = Field(
+        default_factory=dict, description="高频食材计数，如 {'鸡蛋': 8, '番茄': 6}"
+    )
+    total_recommendations: int = Field(default=0, description="累计推荐次数")
+    last_updated: str = Field(default="", description="最后更新时间 ISO 格式")
+
+
+class UserProfile(BaseModel):
+    """用户画像 —— 独立 JSON 文件存储"""
+    user_id: int
+    preferences: UserPreferences = Field(default_factory=UserPreferences)
+    allergens: list[str] = Field(default_factory=list, description="过敏原列表")
+    excluded_ingredients: list[str] = Field(default_factory=list, description="忌口食材列表")
+    equipment: list[str] = Field(default_factory=list, description="可用厨具列表")
+    stats: UserStats = Field(default_factory=UserStats)

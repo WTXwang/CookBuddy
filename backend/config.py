@@ -46,11 +46,17 @@ KNOWLEDGE_BASE_DIR: str = os.path.join(BASE_DIR, "..", "knowledge-base", "recipe
 DATA_DIR: str = os.path.join(BASE_DIR, "..", "data")
 
 # ============================================================
-# MySQL 数据库 —— 修改下面这行，填你的真实密码
+# SQLite 数据库路径
 # ============================================================
-DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "mysql://root:specialone27@127.0.0.1:3306/chef"
+DATABASE_PATH: str = os.getenv(
+    "DATABASE_PATH",
+    str(os.path.join(BASE_DIR, "data", "users.db"))
+)
+
+# 用户画像 JSON 目录
+PROFILES_DIR: str = os.getenv(
+    "PROFILES_DIR",
+    str(os.path.join(BASE_DIR, "data", "profiles"))
 )
 
 # ============================================================

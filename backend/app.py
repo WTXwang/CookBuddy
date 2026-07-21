@@ -1,24 +1,30 @@
 """FastAPI 入口 —— 今晚吃什么 推荐服务"""
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from schemas import RecommendRequest, RecommendationResponse
 from graph import recommend as run_recommend
-from routers.auth import router as auth_router
+from routers.auth import router as auth_router, get_optional_user_id, set_profile_store
+from profiles import ProfileStore
 import database
+import config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """启动/关闭钩子"""
-    # 启动时预编译 graph
+    # 预编译 graph
     from graph import get_graph
     get_graph()
-    await database.init_pool()
+    await database.init_db()
+
+    # 初始化用户画像存储
+    profile_store = ProfileStore(config.PROFILES_DIR)
+    set_profile_store(profile_store)
+
     yield
-    await database.close_pool()
+    await database.close_db()
 
 
 app = FastAPI(
@@ -52,17 +58,60 @@ async def health():
 
 
 @app.post("/api/recommend")
-async def api_recommend(req: RecommendRequest):
+async def api_recommend(
+    req: RecommendRequest,
+    user_id: int | None = Depends(get_optional_user_id),
+):
     """
     统一入口 —— 闲聊或推荐。Concierge 判断意图后路由。
+    登录用户始终融合画像约束，缩小 RAGFlow 检索范围。
     """
     if not req.ingredients_text.strip():
         raise HTTPException(status_code=422, detail="请至少提供一种现有食材")
+
+    # ── 画像融合：始终叠加用户画像到请求中 ──
+    if user_id is not None:
+        from routers.auth import _get_profile_store
+        profile = _get_profile_store().get(user_id)
+
+        # 过敏原 = 画像 + 请求（并集，双向缩小）
+        req.allergens = list(set(profile.allergens + req.allergens))
+
+        # 忌口 = 画像 + 请求（并集）
+        req.excluded = list(set(profile.excluded_ingredients + req.excluded))
+
+        # 厨具 = 始终用画像（用户厨房不变）
+        if profile.equipment:
+            req.equipment = profile.equipment
+
+        # 口味：请求优先，没填用画像
+        if not req.flavor and profile.preferences.flavor:
+            req.flavor = ",".join(profile.preferences.flavor)
+
+        # 难度、时间、份数：请求优先，没填用画像
+        if req.difficulty == "简单" and profile.preferences.difficulty != "任意":
+            req.difficulty = profile.preferences.difficulty
+        if req.time_limit_min == 20 and profile.preferences.time_limit_min != 30:
+            req.time_limit_min = profile.preferences.time_limit_min
+        if req.servings == 2 and profile.preferences.servings != 2:
+            req.servings = profile.preferences.servings
 
     try:
         state = await run_recommend(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"推荐流程异常: {str(e)}")
+
+    # ── 更新画像统计（登录用户） ──
+    if user_id is not None and state.response and state.response.recommendations:
+        try:
+            from routers.auth import _get_profile_store
+            cuisines = [
+                r.title for r in state.response.recommendations[:3]
+            ]
+            ingredients = state.response.request_summary.ingredients if state.response.request_summary else []
+            _get_profile_store().update_stats(user_id, cuisines=cuisines, ingredients=ingredients)
+        except Exception:
+            pass  # 统计更新失败不影响主流程
 
     # 闲聊模式：直接返回对话回复
     if state.intent == "chat" and state.chat_reply:
