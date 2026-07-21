@@ -14,3 +14,6 @@ retrieval/__pycache__/
 test_demo.py 
 我的任务清单.md
 claude.md
+profiles/__pycache__/
+recipes/__pycache__/
+routers/__pycache__/

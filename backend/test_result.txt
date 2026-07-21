@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "D:\Agent\Project\实训项目\backend\test_profile_extractor.py", line 24, in <module>
+    assert '花生' not in p.allergens, f'allergens should not contain 花生: {p.allergens}'
+AssertionError: allergens should not contain 花生: ['花生']

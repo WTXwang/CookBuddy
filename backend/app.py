@@ -1,12 +1,14 @@
 """FastAPI 入口 —— 今晚吃什么 推荐服务"""
 
+import asyncio
+import traceback
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import RecommendRequest, RecommendationResponse
 from graph import recommend as run_recommend
 from routers.auth import router as auth_router, get_optional_user_id, set_profile_store
-from profiles import ProfileStore
+from profiles import ProfileStore, extract_profile_changes, apply_changes
 import database
 import config
 
@@ -57,9 +59,29 @@ async def health():
     return {"status": "ok", "service": "今晚吃什么"}
 
 
+async def _background_profile_update(user_id: int, raw_input: str, conversation_context: str):
+    """异步后台：LLM 分析对话，微调画像"""
+    try:
+        from routers.auth import _get_profile_store
+        store = _get_profile_store()
+        profile = store.get(user_id)
+        profile_json = profile.model_dump_json(indent=2, ensure_ascii=False)
+
+        changes = await extract_profile_changes(profile_json, raw_input, conversation_context)
+        if not changes:
+            return
+
+        if apply_changes(profile, changes):
+            store.save(profile)
+            print(f"[Profile] user_id={user_id} 画像已微调: {changes}")
+    except Exception:
+        traceback.print_exc()
+
+
 @app.post("/api/recommend")
 async def api_recommend(
     req: RecommendRequest,
+    background_tasks: BackgroundTasks,
     user_id: int | None = Depends(get_optional_user_id),
 ):
     """
@@ -112,6 +134,15 @@ async def api_recommend(
             _get_profile_store().update_stats(user_id, cuisines=cuisines, ingredients=ingredients)
         except Exception:
             pass  # 统计更新失败不影响主流程
+
+    # ── 异步后台：LLM 微调画像（不阻塞响应） ──
+    if user_id is not None:
+        background_tasks.add_task(
+            _background_profile_update,
+            user_id,
+            req.ingredients_text,
+            req.conversation_context,
+        )
 
     # 闲聊模式：直接返回对话回复
     if state.intent == "chat" and state.chat_reply:
