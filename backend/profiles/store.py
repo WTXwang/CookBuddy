@@ -1,7 +1,13 @@
-"""用户画像存储 —— 每个用户一个 JSON 文件"""
+"""用户画像存储 —— 每个用户一个 JSON 文件
+
+约束规则：
+  - 口味：固定词汇表，不能自创
+  - 过敏原 / 忌口：每项 ≤10 字，数量有上限
+  - 厨具：固定词汇表
+  - 统计：自动淘汰低频项，防止野蛮生长
+"""
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
@@ -9,8 +15,32 @@ from typing import List
 from schemas import UserProfile, UserPreferences, UserStats
 
 
+# ═══════════════════════════════════════════════════════
+# 固定词汇表
+# ═══════════════════════════════════════════════════════
+
+VALID_FLAVORS = {"辣", "不辣", "酸甜", "清淡", "重口味", "咸香", "麻", "蒜香", "酱香", "酸辣"}
+
+VALID_EQUIPMENT = {"炒锅", "蒸锅", "烤箱", "汤锅", "空气炸锅", "微波炉", "电饭煲", "压力锅", "平底锅", "炖锅"}
+
+VALID_DIFFICULTY = {"任意", "简单", "中等", "困难"}
+
+# 数量上限
+MAX_ALLERGENS = 15          # 过敏原最多 15 项
+MAX_EXCLUDED = 20           # 忌口最多 20 项
+MAX_FLAVOR = 5              # 口味最多选 5 个
+MAX_ITEM_CHARS = 10         # 单项过敏原/忌口最多 10 字
+MAX_STAT_CUISINES = 20      # 菜系统计最多保留 20 项
+MAX_STAT_INGREDIENTS = 30   # 食材统计最多保留 30 项
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _top_keys(d: dict, n: int) -> dict:
+    """保留计数最高的 n 个 key"""
+    return dict(sorted(d.items(), key=lambda x: x[1], reverse=True)[:n])
 
 
 class ProfileStore:
@@ -47,6 +77,48 @@ class ProfileStore:
             encoding="utf-8",
         )
 
+    # ── 校验 ──────────────────────────────────────────
+
+    @staticmethod
+    def _validate_flavor(flavor: List[str]) -> List[str]:
+        """只保留合法口味，去重，限制数量"""
+        valid = [f for f in flavor if f in VALID_FLAVORS]
+        seen = set()
+        result = []
+        for f in valid:
+            if f not in seen:
+                seen.add(f)
+                result.append(f)
+        return result[:MAX_FLAVOR]
+
+    @staticmethod
+    def _validate_items(items: List[str], max_items: int) -> List[str]:
+        """每项 ≤10 字，去重，限制数量"""
+        result = []
+        seen = set()
+        for item in items:
+            item = item.strip()
+            if not item or item in seen:
+                continue
+            if len(item) > MAX_ITEM_CHARS:
+                item = item[:MAX_ITEM_CHARS]
+            seen.add(item)
+            result.append(item)
+            if len(result) >= max_items:
+                break
+        return result
+
+    @staticmethod
+    def _validate_equipment(equipment: List[str]) -> List[str]:
+        """只保留合法厨具，去重"""
+        seen = set()
+        result = []
+        for e in equipment:
+            if e in VALID_EQUIPMENT and e not in seen:
+                seen.add(e)
+                result.append(e)
+        return result
+
     # ── 更新偏好 ──────────────────────────────────────
 
     def update_preferences(
@@ -60,23 +132,23 @@ class ProfileStore:
         excluded_ingredients: List[str] | None = None,
         equipment: List[str] | None = None,
     ) -> UserProfile:
-        """部分更新偏好字段"""
+        """部分更新偏好字段（自动校验 + 截断）"""
         profile = self.get(user_id)
 
         if flavor is not None:
-            profile.preferences.flavor = flavor
-        if difficulty is not None:
+            profile.preferences.flavor = self._validate_flavor(flavor)
+        if difficulty is not None and difficulty in VALID_DIFFICULTY:
             profile.preferences.difficulty = difficulty
         if time_limit_min is not None:
-            profile.preferences.time_limit_min = time_limit_min
+            profile.preferences.time_limit_min = max(1, min(480, time_limit_min))
         if servings is not None:
-            profile.preferences.servings = servings
+            profile.preferences.servings = max(1, min(20, servings))
         if allergens is not None:
-            profile.allergens = allergens
+            profile.allergens = self._validate_items(allergens, MAX_ALLERGENS)
         if excluded_ingredients is not None:
-            profile.excluded_ingredients = excluded_ingredients
+            profile.excluded_ingredients = self._validate_items(excluded_ingredients, MAX_EXCLUDED)
         if equipment is not None:
-            profile.equipment = equipment
+            profile.equipment = self._validate_equipment(equipment)
 
         self.save(profile)
         return profile
@@ -89,7 +161,7 @@ class ProfileStore:
         cuisines: List[str] | None = None,
         ingredients: List[str] | None = None,
     ) -> None:
-        """每次推荐后更新历史统计"""
+        """每次推荐后更新历史统计，自动淘汰低频项"""
         profile = self.get(user_id)
         stats = profile.stats
 
@@ -98,9 +170,13 @@ class ProfileStore:
 
         for c in (cuisines or []):
             stats.favorite_cuisines[c] = stats.favorite_cuisines.get(c, 0) + 1
-
         for ing in (ingredients or []):
             stats.frequent_ingredients[ing] = stats.frequent_ingredients.get(ing, 0) + 1
+
+        # 每 10 次推荐清理一次低频项
+        if stats.total_recommendations % 10 == 0:
+            stats.favorite_cuisines = _top_keys(stats.favorite_cuisines, MAX_STAT_CUISINES)
+            stats.frequent_ingredients = _top_keys(stats.frequent_ingredients, MAX_STAT_INGREDIENTS)
 
         profile.stats = stats
         self.save(profile)
