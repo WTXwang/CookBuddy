@@ -1,5 +1,6 @@
 """LLM 画像微调 —— 异步后台，从对话中提取画像变更"""
 
+import asyncio
 import json
 from typing import Optional
 
@@ -65,7 +66,8 @@ async def extract_profile_changes(
         失败或无需变更时返回空列表
     """
     try:
-        result = chat_json(
+        result = await asyncio.to_thread(
+            chat_json,
             prompt=_build_prompt(profile_json, user_input, conversation_context),
             system=SYSTEM_PROMPT,
             model=config.EXTRACTOR_MODEL,

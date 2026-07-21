@@ -1,5 +1,6 @@
 """Concierge Agent —— 对话门面 + 意图路由（不提取字段，那是Parser的活）"""
 
+import asyncio
 import json
 from typing import Optional
 from dataclasses import dataclass
@@ -142,7 +143,12 @@ async def concierge_chat(user_text: str, context: str = "") -> ConciergeResult:
     if context:
         prompt = f"[上一轮对话]\n{context}\n\n[用户当前输入]\n{user_text}"
 
-    result = chat_json(prompt, system=CONCIERGE_SYSTEM_PROMPT, model=config.CONCIERGE_MODEL)
+    result = await asyncio.to_thread(
+        chat_json,
+        prompt=prompt,
+        system=CONCIERGE_SYSTEM_PROMPT,
+        model=config.CONCIERGE_MODEL,
+    )
 
     if not result:
         return ConciergeResult(intent=Intent.RECOMMEND, reply="好的，我来帮你看看能做什么。")

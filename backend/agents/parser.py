@@ -1,5 +1,6 @@
 """自然语言解析器 —— 将用户输入 + 按钮约束合并，LLM 提取为 UserRequest"""
 
+import asyncio
 import json
 from schemas import UserRequest
 from llm_client import chat_json
@@ -148,7 +149,12 @@ async def parse_to_user_request(
     merged_text = "，".join(parts)
 
     # 调 LLM 解析
-    result = chat_json(merged_text, system=PARSER_SYSTEM_PROMPT, model=config.PARSER_MODEL)
+    result = await asyncio.to_thread(
+        chat_json,
+        prompt=merged_text,
+        system=PARSER_SYSTEM_PROMPT,
+        model=config.PARSER_MODEL,
+    )
 
     if result:
         return UserRequest(
