@@ -43,6 +43,7 @@ class RecommendRequest(BaseModel):
     excluded: list[str] = Field(default_factory=list)
     allergens: list[str] = Field(default_factory=list)
     equipment: list[str] = Field(default_factory=list)
+    conversation_context: str = Field(default="", description="上一轮对话摘要，用于多轮需求修正")
 
 
 class UserRequest(BaseModel):
@@ -148,6 +149,7 @@ class RecommendationResponse(BaseModel):
     recommendations: list[Recommendation] = Field(default_factory=list)
     blocked_recipes: list[dict] = Field(default_factory=list)
     follow_up_question: Optional[str] = None
+    conversation_context: str = ""    # 传递给前端，下轮对话原样传回
     trace_id: str = ""
 
 
@@ -183,6 +185,7 @@ class ChefState(BaseModel):
     """LangGraph 全局状态"""
     # 输入
     raw_input: str = ""
+    conversation_context: str = ""   # 上一轮对话上下文，Concierge 多轮理解用
     request: Optional[NormalizedRequest] = None
 
     # 意图

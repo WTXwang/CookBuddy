@@ -66,7 +66,7 @@ async def api_recommend(req: RecommendRequest):
 
     # 闲聊模式：直接返回对话回复
     if state.intent == "chat" and state.chat_reply:
-        return {"reply": state.chat_reply, "intent": "chat"}
+        return {"reply": state.chat_reply, "intent": "chat", "conversation_context": state.conversation_context}
 
     if state.error and not state.response:
         raise HTTPException(status_code=422, detail=state.error)

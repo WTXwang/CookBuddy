@@ -160,11 +160,8 @@ class RetrievalStub(BaseRetriever):
             core = set(r.core_ingredients)
             optional = set(r.optional_ingredients)
             seasons = set(r.seasonings)
-<<<<<<< HEAD
-=======
             title_words = set(r.title)
 
->>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
             score = 0.0
 
             for ing in ing_set:
@@ -177,21 +174,9 @@ class RetrievalStub(BaseRetriever):
                 # 调料精确命中
                 elif ing in seasons:
                     score += 0.5
-<<<<<<< HEAD
-                else:
-                    for core_ing in core:
-                        if ing in core_ing or core_ing in ing:
-                            score += 1.0
-                            break
-                    for opt_ing in optional:
-                        if ing in opt_ing or opt_ing in ing:
-                            score += 0.3
-                            break
-=======
                 # 标题关键词命中（单字不算，避免误匹配）
                 elif len(ing) >= 2 and ing in title_words:
                     score += 2.0
->>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
 
             if score > 0:
                 r.retrieval_score = min(1.0, score / 10.0)
@@ -200,22 +185,20 @@ class RetrievalStub(BaseRetriever):
         scored.sort(key=lambda r: r.retrieval_score, reverse=True)
         return scored[:top_n]
 
-<<<<<<< HEAD
     def lookup_by_title(self, query: str) -> RecipeRecord | None:
         """精确查找：按菜名匹配（支持模糊包含匹配）"""
         query_lower = query.strip().lower()
-        # 精确匹配
         for r in self.recipes:
             if r.title.lower() == query_lower:
                 return r
-        # 包含匹配："番茄炒蛋怎么做" → 匹配"番茄炒蛋"
         for r in self.recipes:
             if r.title.lower() in query_lower or query_lower in r.title.lower():
-=======
+                return r
+        return None
+
     def get_by_id(self, recipe_id: str) -> Optional[RecipeRecord]:
         """按 ID 查单道菜谱"""
         for r in self.recipes:
             if r.recipe_id == recipe_id:
->>>>>>> b647406772f1eba9b90a3d8efbaac7c795a17058
                 return r
         return None
