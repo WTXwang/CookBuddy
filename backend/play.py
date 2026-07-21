@@ -19,15 +19,10 @@ def hr(c="─"):
 
 
 def show_result(recipes):
-    """按 B 接收到的格式输出"""
-    if not recipes:
-        print("  []\n")
-        return
-
+    """角色A 返回给角色B 的格式：list[RecipeRecord] JSON"""
     import json
-    for i, r in enumerate(recipes[:5], 1):
-        d = r.model_dump()
-        print(f"  [{i}] {json.dumps(d, ensure_ascii=False)}")
+    output = [r.model_dump() for r in recipes[:5]]
+    print(json.dumps(output, ensure_ascii=False, indent=2))
     print()
 
 

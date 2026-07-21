@@ -1,5 +1,12 @@
 .claude/
 cleaned_data/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+backend/data/
+*.db
+.env
+new_howtocook
 __pycache__/
 agents/__pycache__/
 rules/__pycache__/
