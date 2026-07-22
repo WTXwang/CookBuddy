@@ -32,7 +32,7 @@ def _extract_title_from_chunk(content: str, doc_name: str) -> str:
     if m:
         return m.group(1).strip()
     # Fallback: 从文件名提取
-    name = doc_name.replace('.md', '').replace('_', ' ').strip()
+    name = doc_name.rsplit('.', 1)[0].replace('_', ' ').strip() if '.' in doc_name else doc_name.strip()
     return name if name else '未知菜谱'
 
 
@@ -126,7 +126,7 @@ def _chunks_to_recipes(chunks: List[dict]) -> List[RecipeRecord]:
             # 无结构化数据：从 chunk 内容尽力提取
             ingredients = _extract_ingredients_from_chunk(full_body)
             recipe = RecipeRecord(
-                recipe_id=doc_name.replace('.md', ''),
+                recipe_id=doc_name.rsplit('.', 1)[0] if '.' in doc_name else doc_name,
                 title=title,
                 cuisine="家常菜",
                 tags=[],
@@ -243,7 +243,8 @@ class RAGFlowRetriever(BaseRetriever):
     def search_ids(self, ingredients: List[str], top_n: int = 10) -> List[tuple[str, float]]:
         """
         返回 [(recipe_id, score), ...]，不解析完整 RecipeRecord。
-        recipe_id = document_keyword 去掉 .md 后缀。
+        recipe_id = document_keyword 去掉后缀。
+        同时缓存 chunk content，供 get_full_text() 使用。
         """
         if not self._available:
             return self._stub.search_ids(ingredients, top_n)
@@ -259,17 +260,25 @@ class RAGFlowRetriever(BaseRetriever):
             print(f"[RAGFlow] 无结果，降级到 stub")
             return self._stub.search_ids(ingredients, top_n)
 
-        # 按文档分组，取最高相似度
+        # 按文档分组，取最高相似度，同时缓存 content
         doc_scores: dict[str, float] = {}
+        if not hasattr(self, '_content_cache'):
+            self._content_cache: dict[str, str] = {}
         for chunk in chunks:
             doc_key = chunk.get("document_keyword", chunk.get("docnm_kwd", ""))
             if not doc_key:
                 continue
-            rid = doc_key.replace(".md", "").strip()
+            # 去掉文件后缀（.md / .txt / 无后缀均可）
+            rid = doc_key.rsplit(".", 1)[0] if "." in doc_key else doc_key
+            rid = rid.strip()
             if not rid:
                 continue
             sim = chunk.get("similarity", chunk.get("vector_similarity", 0.0))
             doc_scores[rid] = max(doc_scores.get(rid, 0.0), float(sim))
+            # 缓存 content（一个食谱一个块，content 即全文）
+            content = chunk.get("content", "")
+            if content and rid not in self._content_cache:
+                self._content_cache[rid] = content
 
         result = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
         print(f"[RAGFlow] '{query}' → {len(result)} 个文档: "
@@ -306,7 +315,13 @@ class RAGFlowRetriever(BaseRetriever):
         return result
 
     def get_full_text(self, recipe_id: str) -> str | None:
-        """从 RAGFlow 获取菜谱文档全文（拼接所有 chunks）"""
+        """从 RAGFlow 获取菜谱全文（优先 search_ids 缓存，兜底检索拼接）"""
+        # 缓存命中（一个食谱一个块，content 即全文）
+        cache = getattr(self, '_content_cache', {})
+        if recipe_id in cache:
+            return cache[recipe_id]
+
+        # 兜底：检索拼接
         chunks = self._retrieve(recipe_id, top_n=30)
         if not chunks:
             return None
