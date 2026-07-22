@@ -26,7 +26,20 @@ EXTRACTOR_MODEL: str = os.getenv("CHEF_EXTRACTOR_MODEL", "deepseek-ai/DeepSeek-V
 MAX_RECOMMENDATIONS: int = 3
 RETRIEVAL_TOP_N: int = 10
 LLM_TEMPERATURE: float = 0.3
-TOTAL_TIMEOUT_SEC: int = 15
+TOTAL_TIMEOUT_SEC: int = 45  # 4×LLM(各~30s内部超时) + RAGFlow(10s)，45s 为合理上限
+
+# ============================================================
+# Loop 运行时控流参数（可通过环境变量覆盖）
+# ============================================================
+LOOP_RETRY_MAX: int = int(os.getenv("LOOP_RETRY_MAX", "3"))                    # 最大重试次数 (1~5)
+LOOP_RETRY_BACKOFF_BASE: float = float(os.getenv("LOOP_RETRY_BACKOFF_BASE", "1.5"))  # 退避底数
+LOOP_RETRY_BACKOFF_MIN: float = float(os.getenv("LOOP_RETRY_BACKOFF_MIN", "0.5"))    # 最小退避间隔(秒)
+LOOP_RETRY_BACKOFF_MAX: float = float(os.getenv("LOOP_RETRY_BACKOFF_MAX", "8.0"))    # 最大退避间隔(秒)
+LOOP_CIRCUIT_BREAKER_FAILS: int = int(os.getenv("LOOP_CIRCUIT_BREAKER_FAILS", "5"))  # 连续失败触发熔断
+LOOP_CIRCUIT_BREAKER_COOLDOWN: int = int(os.getenv("LOOP_CIRCUIT_BREAKER_COOLDOWN", "60"))  # 熔断冷却(秒)
+LOOP_MAX_CONCURRENCY: int = int(os.getenv("LOOP_MAX_CONCURRENCY", "3"))        # 最大并发 LLM 调用
+LOOP_LLM_TIMEOUT: float = float(os.getenv("LOOP_LLM_TIMEOUT", "30.0"))         # 单次 LLM HTTP 超时(秒)
+LOOP_TOTAL_TIMEOUT: int = int(os.getenv("LOOP_TOTAL_TIMEOUT", "45"))           # /api/recommend 总超时
 
 # ============================================================
 # 检索后端 —— "stub" | "ragflow"
@@ -35,8 +48,29 @@ RETRIEVAL_BACKEND: str = os.getenv("RETRIEVAL_BACKEND", "stub")
 
 # RAGFlow 配置
 RAGFLOW_HOST: str = os.getenv("RAGFLOW_HOST", "http://127.0.0.1:9380")
-RAGFLOW_API_KEY: str = os.getenv("RAGFLOW_API_KEY", "ragflow-M1btZ5ircgt4Lhn6Y0ogEmvmJ2SIxZmcpEdwN7gIskw")
+RAGFLOW_API_KEY: str = os.getenv("RAGFLOW_API_KEY", "")
 RAGFLOW_KB_NAME: str = os.getenv("RAGFLOW_KB_NAME", "recipe")
+
+# ============================================================
+# Loop 运行时控流参数（可通过环境变量覆盖）
+# ============================================================
+LOOP_RETRY_MAX: int = int(os.getenv("LOOP_RETRY_MAX", "3"))               # 最大重试次数 (1-5)
+LOOP_RETRY_BACKOFF_BASE: float = float(                                    # 指数退避底数
+    os.getenv("LOOP_RETRY_BACKOFF_BASE", "1.5"))
+LOOP_RETRY_BACKOFF_MIN: float = float(                                     # 最小退避间隔（秒）
+    os.getenv("LOOP_RETRY_BACKOFF_MIN", "0.5"))
+LOOP_RETRY_BACKOFF_MAX: float = float(                                     # 最大退避间隔（秒）
+    os.getenv("LOOP_RETRY_BACKOFF_MAX", "8.0"))
+LOOP_CIRCUIT_BREAKER_FAILS: int = int(                                     # 连续失败 N 次后熔断
+    os.getenv("LOOP_CIRCUIT_BREAKER_FAILS", "5"))
+LOOP_CIRCUIT_BREAKER_COOLDOWN: int = int(                                  # 熔断冷却时间（秒）
+    os.getenv("LOOP_CIRCUIT_BREAKER_COOLDOWN", "60"))
+LOOP_MAX_CONCURRENCY: int = int(                                           # 最大并发 LLM 调用数
+    os.getenv("LOOP_MAX_CONCURRENCY", "3"))
+LOOP_LLM_TIMEOUT: float = float(                                           # 单次 LLM HTTP 超时（秒）
+    os.getenv("LOOP_LLM_TIMEOUT", "30.0"))
+LOOP_TOTAL_TIMEOUT: int = int(                                             # /api/recommend 总超时（秒）
+    os.getenv("LOOP_TOTAL_TIMEOUT", "45"))
 
 # ============================================================
 # 路径

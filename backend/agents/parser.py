@@ -3,7 +3,7 @@
 import asyncio
 import json
 from schemas import UserRequest
-from llm_client import chat_json
+from llm_client import chat_json_guarded
 import config
 
 
@@ -150,7 +150,7 @@ async def parse_to_user_request(
 
     # 调 LLM 解析
     result = await asyncio.to_thread(
-        chat_json,
+        chat_json_guarded,
         prompt=merged_text,
         system=PARSER_SYSTEM_PROMPT,
         model=config.PARSER_MODEL,

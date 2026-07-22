@@ -1,7 +1,8 @@
 """CookingGuide Agent —— 做法整理与适配"""
 
+import asyncio
 from schemas import RecipeRecord, CandidateFeature
-from llm_client import create_chat_llm, chat_json
+from llm_client import create_chat_llm, chat_json_guarded
 import config
 
 
@@ -54,12 +55,12 @@ class CookingGuide:
         self.model = model or config.GUIDE_MODEL
         self.llm = create_chat_llm(self.model)
 
-    def generate(self, recipe: RecipeRecord, feature: CandidateFeature) -> dict:
+    async def generate(self, recipe: RecipeRecord, feature: CandidateFeature) -> dict:
         """为一首菜生成结构化做法"""
         # 如果有菜谱正文，尝试用 LLM 重写
         if self.llm is not None and recipe.body:
             try:
-                return self._llm_generate(recipe, feature)
+                return await self._llm_generate(recipe, feature)
             except Exception as e:
                 print(f"[Guide LLM Error] {e}, 降级为规则解析")
 
@@ -67,13 +68,13 @@ class CookingGuide:
             return self._parse_body(recipe, feature)
         elif self.llm is not None:
             try:
-                return self._llm_generate(recipe, feature)
+                return await self._llm_generate(recipe, feature)
             except Exception:
                 pass
 
         return self._generate_default(recipe, feature)
 
-    def _llm_generate(self, recipe: RecipeRecord, feature: CandidateFeature) -> dict:
+    async def _llm_generate(self, recipe: RecipeRecord, feature: CandidateFeature) -> dict:
         """LLM 生成烹饪指导"""
         prompt = GUIDE_USER_PROMPT.format(
             title=recipe.title,
@@ -88,7 +89,9 @@ class CookingGuide:
             missing_optional=", ".join(feature.missing_optional) if feature.missing_optional else "无",
             body=recipe.body or "(无菜谱正文，请根据菜名和食材推断标准做法)",
         )
-        result = chat_json(prompt, system=GUIDE_SYSTEM_PROMPT, model=self.model)
+        result = await asyncio.to_thread(
+            chat_json_guarded, prompt, system=GUIDE_SYSTEM_PROMPT, model=self.model
+        )
         if result:
             return {
                 "prep": result.get("prep", []),

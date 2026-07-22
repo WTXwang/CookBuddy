@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Optional
 
-from llm_client import chat_json
+from llm_client import chat_json_guarded
 import config
 
 
@@ -66,11 +66,14 @@ async def extract_profile_changes(
         失败或无需变更时返回空列表
     """
     try:
-        result = await asyncio.to_thread(
-            chat_json,
-            prompt=_build_prompt(profile_json, user_input, conversation_context),
-            system=SYSTEM_PROMPT,
-            model=config.EXTRACTOR_MODEL,
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                chat_json_guarded,
+                prompt=_build_prompt(profile_json, user_input, conversation_context),
+                system=SYSTEM_PROMPT,
+                model=config.EXTRACTOR_MODEL,
+            ),
+            timeout=20,  # 后台任务，不阻塞响应，20s 足够
         )
     except Exception:
         return []

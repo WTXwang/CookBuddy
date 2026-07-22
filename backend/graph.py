@@ -225,7 +225,7 @@ def node_score(state: ChefState) -> ChefState:
     return state
 
 
-def node_guide(state: ChefState) -> ChefState:
+async def node_guide(state: ChefState) -> ChefState:
     """做法生成：为 Top 3 生成烹饪指导"""
     _timer(state, 'guide')
     state.stage = GraphStage.GUIDE
@@ -251,7 +251,7 @@ def node_guide(state: ChefState) -> ChefState:
         if not recipe:
             continue
 
-        guide_data = _guide.generate(recipe, feat)
+        guide_data = await _guide.generate(recipe, feat)
 
         score = feat.final_score
         match_label = "完美匹配" if score >= 90 else ("推荐" if score >= 70 else "可做")
@@ -297,7 +297,7 @@ def node_guide(state: ChefState) -> ChefState:
     return state
 
 
-def node_safety(state: ChefState) -> ChefState:
+async def node_safety(state: ChefState) -> ChefState:
     """安全审查"""
     _timer(state, 'safety')
     state.stage = GraphStage.SAFETY
@@ -308,7 +308,7 @@ def node_safety(state: ChefState) -> ChefState:
 
     safe_recs = []
     for rec in state.response.recommendations:
-        report = _safety.review(rec, state.user_allergens, state.user_excluded)
+        report = await _safety.review(rec, state.user_allergens, state.user_excluded)
         if report.severity == "blocked":
             # 移到 blocked 列表
             state.response.blocked_recipes.append({

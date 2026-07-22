@@ -6,7 +6,7 @@ from typing import Optional
 from dataclasses import dataclass
 
 from schemas import Intent
-from llm_client import chat_json
+from llm_client import chat_json_guarded
 import config
 
 
@@ -144,7 +144,7 @@ async def concierge_chat(user_text: str, context: str = "") -> ConciergeResult:
         prompt = f"[上一轮对话]\n{context}\n\n[用户当前输入]\n{user_text}"
 
     result = await asyncio.to_thread(
-        chat_json,
+        chat_json_guarded,
         prompt=prompt,
         system=CONCIERGE_SYSTEM_PROMPT,
         model=config.CONCIERGE_MODEL,

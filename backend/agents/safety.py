@@ -1,8 +1,9 @@
 """FoodSafetyReviewer Agent —— 食品安全审查"""
 
+import asyncio
 from typing import List, Optional
 from schemas import SafetyReport, Recommendation
-from llm_client import create_chat_llm, chat_json
+from llm_client import create_chat_llm, chat_json_guarded
 import config
 
 
@@ -62,7 +63,7 @@ class FoodSafetyReviewer:
         self.model = model or config.SAFETY_MODEL
         self.llm = create_chat_llm(self.model)
 
-    def review(self,
+    async def review(self,
                recommendation: Recommendation,
                user_allergens: List[str],
                user_excluded: List[str]) -> SafetyReport:
@@ -75,7 +76,7 @@ class FoodSafetyReviewer:
         # LLM 增强审查
         if self.llm is not None:
             try:
-                llm_report = self._llm_review(recommendation, user_allergens, user_excluded)
+                llm_report = await self._llm_review(recommendation, user_allergens, user_excluded)
                 if llm_report:
                     all_issues = list(set(rule_report.issues + llm_report.issues))
                     all_suggestions = list(set(rule_report.revision_suggestions + llm_report.revision_suggestions))
@@ -122,7 +123,7 @@ class FoodSafetyReviewer:
             revision_suggestions=suggestions,
         )
 
-    def _llm_review(self, rec, user_allergens, user_excluded) -> Optional[SafetyReport]:
+    async def _llm_review(self, rec, user_allergens, user_excluded) -> Optional[SafetyReport]:
         """LLM 增强审查"""
         prompt = SAFETY_USER_PROMPT.format(
             title=rec.title,
@@ -133,7 +134,9 @@ class FoodSafetyReviewer:
             allergens=", ".join(user_allergens) if user_allergens else "无",
             excluded=", ".join(user_excluded) if user_excluded else "无",
         )
-        result = chat_json(prompt, system=SAFETY_SYSTEM_PROMPT, model=self.model)
+        result = await asyncio.to_thread(
+            chat_json_guarded, prompt, system=SAFETY_SYSTEM_PROMPT, model=self.model
+        )
         if result:
             return SafetyReport(
                 passed=result.get("passed", True),

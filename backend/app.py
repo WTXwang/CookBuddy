@@ -67,13 +67,18 @@ async def _background_profile_update(user_id: int, raw_input: str, conversation_
         profile = store.get(user_id)
         profile_json = profile.model_dump_json(indent=2, ensure_ascii=False)
 
-        changes = await extract_profile_changes(profile_json, raw_input, conversation_context)
+        changes = await asyncio.wait_for(
+            extract_profile_changes(profile_json, raw_input, conversation_context),
+            timeout=25,  # 比 extractor 内部 20s 多 5s 缓冲
+        )
         if not changes:
             return
 
         if apply_changes(profile, changes):
             store.save(profile)
             print(f"[Profile] user_id={user_id} 画像已微调: {changes}")
+    except asyncio.TimeoutError:
+        print(f"[Profile] user_id={user_id} 画像更新超时，跳过")
     except Exception:
         traceback.print_exc()
 
@@ -119,7 +124,15 @@ async def api_recommend(
             req.servings = profile.preferences.servings
 
     try:
-        state = await run_recommend(req)
+        state = await asyncio.wait_for(
+            run_recommend(req),
+            timeout=config.LOOP_TOTAL_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail=f"推荐流程超时（{config.LOOP_TOTAL_TIMEOUT}s），请稍后重试或减少食材数量",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"推荐流程异常: {str(e)}")
 

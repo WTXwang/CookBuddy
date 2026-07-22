@@ -34,7 +34,7 @@ def create_chat_llm(model: str = "",
         base_url=config.SILICONFLOW_BASE_URL,
         temperature=temperature,
         max_tokens=4096,
-        timeout=30,
+        timeout=config.LOOP_LLM_TIMEOUT,
     )
 
 
@@ -55,7 +55,7 @@ def _get_client() -> Optional[OpenAI]:
     _client = OpenAI(
         api_key=api_key,
         base_url=config.SILICONFLOW_BASE_URL,
-        timeout=30.0,
+        timeout=config.LOOP_LLM_TIMEOUT,
     )
     return _client
 
@@ -169,3 +169,47 @@ def image_to_ingredients(image_path: str,
     except Exception as e:
         print(f"[Vision Error] {e}")
         return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# Guarded 版本 —— 自动重试 + 熔断 + 并发控制
+# 使用 loop.py 对 chat/chat_json 进行运行时防护。
+# 调用方将 chat_json 替换为 chat_json_guarded 即可无痛接入。
+# ═══════════════════════════════════════════════════════════════
+
+def chat_guarded(prompt: str,
+                 system: Optional[str] = None,
+                 model: str = "",
+                 temperature: float = config.LLM_TEMPERATURE,
+                 response_format: Optional[str] = None) -> Optional[str]:
+    """带 Loop 保护的 chat：自动重试 + 熔断 + 并发控制。
+
+    签名与 chat() 完全一致，调用方可直接替换。
+    """
+    from loop import retry_with_backoff
+
+    return retry_with_backoff(
+        chat,
+        prompt,
+        system=system,
+        model=model,
+        temperature=temperature,
+        response_format=response_format,
+    )
+
+
+def chat_json_guarded(prompt: str,
+                      system: Optional[str] = None,
+                      model: str = "") -> Optional[dict]:
+    """带 Loop 保护的 chat_json：自动重试 + 熔断 + 并发控制。
+
+    签名与 chat_json() 完全一致，调用方可直接替换。
+    """
+    from loop import retry_with_backoff
+
+    return retry_with_backoff(
+        chat_json,
+        prompt,
+        system=system,
+        model=model,
+    )
