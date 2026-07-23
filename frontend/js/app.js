@@ -288,22 +288,42 @@ const App = {
     const aiContainer = Renderer.addAIMessage();
     Renderer.createLoadingBox(aiContainer);
 
-    mockRecommend(
-      text,
-      constraints,
-      (stageIndex, stage) => Renderer.updateStage(stageIndex, stage),
-      (percent) => Renderer.updateProgress(percent)
-    ).then(data => {
-      this._onSuccess(aiContainer, data);
-      // 记录 AI 回复
-      if (conv) {
-        conv.messages.push({ role: 'ai', data });
-        this._saveConversations();
-        this._renderHistory();  // 更新标题
-      }
-    }).catch(err => {
-      this._onError(aiContainer, err.message);
-    });
+    const apiUrl = (window.API_BASE || 'http://localhost:8001') + '/api/recommend';
+
+    fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ingredients_text: text,
+        servings: constraints.servings,
+        time_limit_min: constraints.time_limit_min,
+        difficulty: constraints.difficulty,
+        flavor: constraints.flavor,
+        excluded: constraints.excluded,
+        allergens: constraints.allergens,
+        equipment: constraints.equipment,
+      }),
+    })
+      .then(res => {
+        if (!res.ok) return res.json().then(e => { throw new Error(e.detail || '服务器错误'); });
+        return res.json();
+      })
+      .then(data => {
+        // 闲聊回复
+        if (data.intent === 'chat' && data.reply) {
+          data.recommendations = [];
+          data.follow_up_question = data.reply;
+        }
+        this._onSuccess(aiContainer, data);
+        if (conv) {
+          conv.messages.push({ role: 'ai', data });
+          this._saveConversations();
+          this._renderHistory();
+        }
+      })
+      .catch(err => {
+        this._onError(aiContainer, err.message || '请求失败，请检查后端是否启动');
+      });
   },
 
   retry() {
