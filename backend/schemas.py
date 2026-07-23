@@ -190,6 +190,7 @@ class ChefState(BaseModel):
 
     # 意图
     intent: Intent = Intent.RECOMMEND
+    dish_name: str = ""                     # Concierge 提取的菜名（intent=lookup 时用）
 
     # 中间结果
     candidates: list[RecipeRecord] = Field(default_factory=list)

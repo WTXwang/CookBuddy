@@ -36,6 +36,33 @@ class BaseRetriever(ABC):
         """
         ...
 
+    @abstractmethod
+    def search_by_name(self, dish_name: str, top_n: int = 10) -> List[RecipeRecord]:
+        """
+        按菜名检索，适配 lookup 意图（用户已知菜名，查做法）。
+
+        Args:
+            dish_name: 用户输入的菜名，如 "番茄炒蛋"
+            top_n: 最多返回多少道候选
+
+        Returns:
+            按检索分降序排列的 RecipeRecord 列表
+        """
+        ...
+
+    @abstractmethod
+    def get_suggestions(self, top_n: int = 5) -> List[RecipeRecord]:
+        """
+        无食材时的兜底推荐 —— 返回热门/随机菜谱。
+
+        Args:
+            top_n: 返回数量
+
+        Returns:
+            随机或热门菜谱列表
+        """
+        ...
+
     def get_full_text(self, recipe_id: str) -> str | None:
         """获取菜谱全文。默认返回 None（stub 不支持）"""
         return None

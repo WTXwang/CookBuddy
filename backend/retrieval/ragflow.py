@@ -314,6 +314,62 @@ class RAGFlowRetriever(BaseRetriever):
               f"{[(r.title, round(r.retrieval_score, 2)) for r in result[:5]]}")
         return result
 
+    def search_by_name(self, dish_name: str, top_n: int = 10) -> List[RecipeRecord]:
+        """按菜名向量检索：直接用菜名当 query 调 RAGFlow"""
+        if not self._available:
+            return self._stub.search_by_name(dish_name, top_n)
+
+        try:
+            chunks = self._retrieve(dish_name.strip(), top_n)
+        except Exception as e:
+            print(f"[RAGFlow] search_by_name 异常: {e}，降级到 stub")
+            return self._stub.search_by_name(dish_name, top_n)
+
+        if not chunks:
+            return self._stub.search_by_name(dish_name, top_n)
+
+        recipes = _chunks_to_recipes(chunks)
+        if not recipes:
+            return self._stub.search_by_name(dish_name, top_n)
+
+        recipes.sort(key=lambda r: r.retrieval_score, reverse=True)
+        result = recipes[:top_n]
+
+        print(f"[RAGFlow] name='{dish_name}' → {len(result)} 道菜: "
+              f"{[(r.title, round(r.retrieval_score, 2)) for r in result[:5]]}")
+        return result
+
+    def get_suggestions(self, top_n: int = 5) -> List[RecipeRecord]:
+        """多 query 合并去重 —— 无食材时兜底推荐"""
+        if not self._available:
+            return self._stub.get_suggestions(top_n)
+
+        queries = ["家常菜", "快手菜", "下饭菜"]
+        seen: set[str] = set()
+        merged: list[RecipeRecord] = []
+
+        for q in queries:
+            try:
+                chunks = self._retrieve(q, top_n)
+            except Exception:
+                continue
+            if not chunks:
+                continue
+            for r in _chunks_to_recipes(chunks):
+                rid = r.recipe_id or r.title
+                if rid not in seen:
+                    seen.add(rid)
+                    merged.append(r)
+
+        if merged:
+            merged.sort(key=lambda r: r.retrieval_score, reverse=True)
+            result = merged[:top_n]
+            print(f"[RAGFlow] suggestions → {len(result)} 道: "
+                  f"{[r.title for r in result]}")
+            return result
+
+        return self._stub.get_suggestions(top_n)
+
     def get_full_text(self, recipe_id: str) -> str | None:
         """从 RAGFlow 获取菜谱全文（优先 search_ids 缓存，兜底检索拼接）"""
         # 缓存命中（一个食谱一个块，content 即全文）

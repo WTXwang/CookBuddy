@@ -190,6 +190,47 @@ class RetrievalStub(BaseRetriever):
         candidates = self.search(ingredients, top_n)
         return [(r.recipe_id, r.retrieval_score) for r in candidates]
 
+    def search_by_name(self, dish_name: str, top_n: int = 10) -> List[RecipeRecord]:
+        """按菜名模糊匹配：标题包含菜名 or 菜名包含标题"""
+        scored = []
+        name_lower = dish_name.strip().lower()
+        if not name_lower:
+            return []
+
+        for r in self.recipes:
+            title_lower = r.title.lower()
+            # 双向包含匹配
+            if name_lower in title_lower or title_lower in name_lower:
+                # 完全匹配 > 包含匹配
+                exact = (name_lower == title_lower)
+                r.retrieval_score = 1.0 if exact else 0.8
+                scored.append(r)
+            # 部分词匹配（菜名拆词后任意一个命中标题）
+            else:
+                parts = [p for p in name_lower if len(p) >= 2]
+                # 简单策略：取菜名的 2-gram 检查是否在标题中
+                hit = False
+                for i in range(len(name_lower) - 1):
+                    bigram = name_lower[i:i+2]
+                    if bigram in title_lower:
+                        hit = True
+                        break
+                if hit:
+                    r.retrieval_score = 0.5
+                    scored.append(r)
+
+        scored.sort(key=lambda r: r.retrieval_score, reverse=True)
+        return scored[:top_n] if scored else []
+
+    def get_suggestions(self, top_n: int = 5) -> List[RecipeRecord]:
+        """随机推荐"""
+        import random
+        pool = list(self.recipes)
+        random.shuffle(pool)
+        for r in pool[:top_n]:
+            r.retrieval_score = 0.3
+        return pool[:top_n]
+
     def get_by_id(self, recipe_id: str) -> Optional[RecipeRecord]:
         """按 ID 查单道菜谱"""
         for r in self.recipes:

@@ -82,6 +82,7 @@ async def node_concierge(state: ChefState) -> ChefState:
     result = await concierge_chat(user_text=text, context=state.conversation_context)
     state.intent = result.intent
     state.chat_reply = result.reply
+    state.dish_name = result.dish_name
 
     # 更新上下文，供下一轮对话使用
     state.conversation_context = f"用户说：{text}\n助手回复：{result.reply}"
@@ -120,16 +121,12 @@ async def node_parser(state: ChefState) -> ChefState:
 
 
 def node_lookup(state: ChefState) -> ChefState:
-    """教学线：把菜名传给后端，提示走直接检索"""
+    """教学线：Concierge 已提取菜名，直接设置 raw_ingredients 供检索使用"""
     _timer(state, 'lookup')
     state.stage = GraphStage.LOOKUP
 
-    # 从输入中提取菜名（去除"怎么做"等提问词）
-    import re
-    dish_name = re.sub(r'怎么做|做法|步骤|怎么烧|教我做|有没有|的家常做法|的菜谱', '', state.raw_input).strip()
-
-    # 把菜名当作食材名传给 A 的检索
-    state.raw_ingredients = [dish_name] if dish_name else [state.raw_input.strip()]
+    dish_name = state.dish_name or state.raw_input.strip()
+    state.raw_ingredients = [dish_name]
     state.intent = Intent.LOOKUP
 
     _lap(state, 'lookup')
@@ -141,13 +138,11 @@ def node_normalize(state: ChefState) -> ChefState:
     _timer(state, 'normalize')
     state.stage = GraphStage.NORMALIZE
 
-    if not state.raw_ingredients:
-        state.error = "未能识别到食材，请再描述一下你有哪些食材？"
-        state.stage = GraphStage.ERROR
-        return state
-
-    # 标准化（交给 A）
-    normalized = normalize_ingredients(state.raw_ingredients)
+    # 标准化（交给 A）—— 空食材时跳过，靠 retrieve 兜底
+    if state.raw_ingredients:
+        normalized = normalize_ingredients(state.raw_ingredients)
+    else:
+        normalized = []
 
     # 基础调料
     staples = get_staples(assume=True, include_aromatics=True)
@@ -171,13 +166,33 @@ def node_normalize(state: ChefState) -> ChefState:
 
 
 def node_retrieve(state: ChefState) -> ChefState:
-    """知识库检索"""
+    """知识库检索 —— 按意图分流：lookup 走菜名检索，recommend 走食材检索"""
     _timer(state, 'retrieve')
     state.stage = GraphStage.RETRIEVE
 
+    # ── Lookup 路径：用户已知菜名，查做法 ──
+    if state.intent == Intent.LOOKUP:
+        dish_name = state.raw_ingredients[0] if state.raw_ingredients else state.raw_input.strip()
+        if not dish_name:
+            state.error = "未能识别菜名"
+            state.stage = GraphStage.ERROR
+            _lap(state, 'retrieve')
+            return state
+        state.candidates = _retrieval.search_by_name(dish_name, top_n=1)
+        if not state.candidates:
+            state.error = f"未找到「{dish_name}」的做法"
+            state.stage = GraphStage.ERROR
+        _lap(state, 'retrieve')
+        return state
+
+    # ── Recommend 路径：按标准化食材检索 ──
     if not state.request or not state.request.ingredients:
-        state.error = "无可检索食材"
-        state.stage = GraphStage.ERROR
+        # 无食材：兜底推荐
+        state.candidates = _retrieval.get_suggestions(top_n=5)
+        if not state.candidates:
+            state.error = "无可检索食材"
+            state.stage = GraphStage.ERROR
+        _lap(state, 'retrieve')
         return state
 
     ing_names = [i.name for i in state.request.ingredients]
