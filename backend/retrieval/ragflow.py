@@ -1,12 +1,32 @@
 """RAGFlow 真实检索 —— 通过 REST API 调用本地 RAGFlow 实例
 
-RAGFlow 知识库中的菜谱是纯 markdown 格式（无 YAML 头部），
-chunk 只包含正文段落。检索策略：
-  1. 调 RAGFlow /api/v1/retrieval 获取相关 chunks
-  2. 按文档分组，取最高相似度作为检索分
-  3. 从 chunk 内容提取标题和食材信息构建 RecipeRecord
-  4. 如果菜谱在 stub 种子数据中存在，用 stub 的结构化元数据
+检索时自动展开食材别名，避免标准化后遗漏 KB 中的同义词。
+例: 用户搜"土豆"，实际查询为"土豆 马铃薯 洋芋"，确保 KB 中任何写法都能命中。
 """
+
+
+def _expand_aliases(ingredients: list[str]) -> str:
+    """将食材列表展开为包含所有别名的搜索字符串"""
+    from rules.normalizer import SYNONYM_MAP
+
+    # 反向映射: 标准名 → [所有别名]
+    reverse: dict[str, list[str]] = {}
+    for alias, std in SYNONYM_MAP.items():
+        reverse.setdefault(std, []).append(alias)
+
+    expanded: set[str] = set()
+    for ing in ingredients:
+        ing = ing.strip()
+        if not ing:
+            continue
+        expanded.add(ing)
+        std = SYNONYM_MAP.get(ing, ing)
+        expanded.add(std)
+        for a in reverse.get(std, []):
+            expanded.add(a)
+
+    return " ".join(expanded)
+
 
 import re
 import json
@@ -249,7 +269,7 @@ class RAGFlowRetriever(BaseRetriever):
         if not self._available:
             return self._stub.search_ids(ingredients, top_n)
 
-        query = " ".join(ingredients)
+        query = _expand_aliases(ingredients)
         try:
             chunks = self._retrieve(query, top_n)
         except Exception as e:
@@ -289,7 +309,7 @@ class RAGFlowRetriever(BaseRetriever):
         if not self._available:
             return self._stub.search(ingredients, top_n)
 
-        query = " ".join(ingredients)
+        query = _expand_aliases(ingredients)
         try:
             chunks = self._retrieve(query, top_n)
         except Exception as e:

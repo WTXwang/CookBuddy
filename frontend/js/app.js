@@ -288,7 +288,7 @@ const App = {
     const aiContainer = Renderer.addAIMessage();
     Renderer.createLoadingBox(aiContainer);
 
-    const apiUrl = (window.API_BASE || 'http://localhost:8001') + '/api/recommend';
+    const apiUrl = (window.API_BASE || 'http://localhost:8000') + '/api/recommend';
 
     fetch(apiUrl, {
       method: 'POST',
