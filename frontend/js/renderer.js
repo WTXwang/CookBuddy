@@ -159,6 +159,15 @@ const Renderer = {
     this._scrollBottom();
   },
 
+  /** 聊天回复气泡 */
+  renderChatReply(container, text) {
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    bubble.innerHTML = `<span class="chat-bubble-icon">🍳</span><span>${this._esc(text)}</span>`;
+    container.appendChild(bubble);
+    this._scrollBottom();
+  },
+
   /** 错误状态 */
   renderError(container, message) {
     const box = document.createElement('div');

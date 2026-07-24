@@ -70,6 +70,15 @@ const App = {
     // 新对话
     document.getElementById('newChatBtn').addEventListener('click', () => this._newConversation());
 
+    // 清空历史
+    document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+      if (!confirm('确定要清空所有对话记录吗？此操作不可撤销。')) return;
+      localStorage.removeItem(this._getStorageKey());
+      this.conversations = [];
+      this._newConversation();
+      this._renderHistory();
+    });
+
     // 侧边栏切换
     document.getElementById('sidebarToggle').addEventListener('click', () => this._toggleSidebar());
     document.getElementById('sidebarExpandBtn').addEventListener('click', () => this._expandSidebar());
@@ -283,8 +292,8 @@ const App = {
       tags.push('忌口: ' + constraints.excluded.join('、'));
     }
 
-    // 渲染用户消息
-    Renderer.clear();
+    // 渲染用户消息（不清理历史）
+    Renderer.emptyStateEl.style.display = 'none';
     Renderer.addUserMessage(text, tags);
 
     // 记录到对话
@@ -294,6 +303,27 @@ const App = {
 
     const aiContainer = Renderer.addAIMessage();
     Renderer.createLoadingBox(aiContainer);
+
+    // 进度条模拟动画 —— 真实 API 路径不会收到阶段回调，用定时器推进
+    const stages = typeof STAGES !== 'undefined' ? STAGES : [
+      { icon: '🥚🔪', text: '正在整理食材' },
+      { icon: '📖🔍', text: '正在翻找菜谱' },
+      { icon: '🧪✨', text: '正在匹配搭配' },
+      { icon: '🍳🔥', text: '正在烹饪做法' },
+      { icon: '🔒✅', text: '正在安全检查' }
+    ];
+    let stageIdx = 0;
+    this._progressTimer = setInterval(() => {
+      if (stageIdx < stages.length) {
+        Renderer.updateStage(stageIdx, stages[stageIdx]);
+        const pct = Math.round(((stageIdx + 1) / (stages.length + 1)) * 90);
+        Renderer.updateProgress(pct);
+        stageIdx++;
+      } else {
+        clearInterval(this._progressTimer);
+        this._progressTimer = null;
+      }
+    }, 1500);
 
     const apiUrl = (window.API_BASE || 'http://localhost:8001') + '/api/recommend';
 
@@ -309,6 +339,7 @@ const App = {
         excluded: constraints.excluded,
         allergens: constraints.allergens,
         equipment: constraints.equipment,
+        conversation_context: conv ? (conv.conversationContext || '') : '',
       }),
     })
       .then(res => {
@@ -316,14 +347,16 @@ const App = {
         return res.json();
       })
       .then(data => {
-        // 闲聊回复
         if (data.intent === 'chat' && data.reply) {
-          data.recommendations = [];
-          data.follow_up_question = data.reply;
+          this._onChatReply(aiContainer, data.reply);
+        } else {
+          this._onSuccess(aiContainer, data);
         }
-        this._onSuccess(aiContainer, data);
         if (conv) {
           conv.messages.push({ role: 'ai', data });
+          if (data.conversation_context) {
+            conv.conversationContext = data.conversation_context;
+          }
           this._saveConversations();
           this._renderHistory();
         }
@@ -342,7 +375,9 @@ const App = {
   _onSuccess(container, data) {
     this.state = 'done';
     this.sendBtn.disabled = false;
-    Renderer.removeLoading();
+    if (this._progressTimer) { clearInterval(this._progressTimer); this._progressTimer = null; }
+    Renderer.updateProgress(100);
+    setTimeout(() => Renderer.removeLoading(), 300);
     if (!data.recommendations || data.recommendations.length === 0) {
       Renderer.renderNoResult(container, data.follow_up_question);
     } else {
@@ -350,10 +385,21 @@ const App = {
     }
   },
 
+  _onChatReply(container, text) {
+    this.state = 'done';
+    this.sendBtn.disabled = false;
+    if (this._progressTimer) { clearInterval(this._progressTimer); this._progressTimer = null; }
+    Renderer.updateProgress(100);
+    setTimeout(() => Renderer.removeLoading(), 300);
+    Renderer.renderChatReply(container, text);
+  },
+
   _onError(container, message) {
     this.state = 'done';
     this.sendBtn.disabled = false;
-    Renderer.removeLoading();
+    if (this._progressTimer) { clearInterval(this._progressTimer); this._progressTimer = null; }
+    Renderer.updateProgress(100);
+    setTimeout(() => Renderer.removeLoading(), 300);
     Renderer.renderError(container, message);
   },
 

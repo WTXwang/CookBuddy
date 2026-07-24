@@ -125,9 +125,17 @@ body {
 
 /* Sidebar footer */
 .sidebar-footer {
+  display: flex; justify-content: space-between; align-items: center;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+.sidebar-clear-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; padding: 4px 8px; border-radius: 6px;
+  color: var(--text-muted); transition: var(--transition);
+}
+.sidebar-clear-btn:hover { background: #fee2e2; color: #dc2626; }
 }
 .sidebar-toggle-btn {
   background: none;
@@ -488,6 +496,17 @@ body {
 .status-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; color: #5c3d20; }
 .status-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
 .status-box.error { border-color: #f5b8a8; background: #fffaf8; }
+
+/* 聊天回复气泡 */
+.chat-bubble {
+  display: inline-flex; align-items: flex-start; gap: 10px;
+  background: #fffefb; border: 1.5px solid var(--border);
+  padding: 12px 18px; border-radius: var(--radius);
+  font-size: 15px; line-height: 1.7; color: var(--text);
+  box-shadow: var(--shadow-sm); max-width: 85%;
+}
+.chat-bubble-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+
 .retry-btn {
   background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border: none;
   padding: 10px 28px; border-radius: 26px; font-size: 15px; font-weight: 700;

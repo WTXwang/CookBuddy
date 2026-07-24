@@ -26,14 +26,29 @@ import config
 # ============================================================
 
 def _extract_title_from_chunk(content: str, doc_name: str) -> str:
-    """从 chunk 内容提取菜谱标题"""
+    """从 chunk 内容提取菜谱标题（不含 emoji 前缀，用于匹配）"""
+    title = None
     # 尝试匹配 "# XXX的做法" 或 "# XXX"
     m = re.search(r'^#\s+(.+?)(?:的做法|$)', content, re.MULTILINE)
     if m:
-        return m.group(1).strip()
-    # Fallback: 从文件名提取
-    name = doc_name.rsplit('.', 1)[0].replace('_', ' ').strip() if '.' in doc_name else doc_name.strip()
-    return name if name else '未知菜谱'
+        title = m.group(1).strip()
+    if not title:
+        # Fallback: 从文件名提取
+        title = doc_name
+    # 统一剥离目录前缀（如 cleaned/、recipes/ 等）
+    title = title.rsplit('/', 1)[-1] if '/' in title else title
+    # 去掉文件后缀
+    if '.' in title:
+        title = title.rsplit('.', 1)[0]
+    title = title.replace('_', ' ').strip()
+    return title if title else '未知菜谱'
+
+def _clean_doc_key(doc_key: str) -> str:
+    """清洗 document_keyword，去掉目录前缀和文件后缀"""
+    key = doc_key.rsplit('/', 1)[-1] if '/' in doc_key else doc_key
+    if '.' in key:
+        key = key.rsplit('.', 1)[0]
+    return key.strip()
 
 
 def _extract_ingredients_from_chunk(content: str) -> List[str]:
@@ -95,8 +110,9 @@ def _chunks_to_recipes(chunks: List[dict]) -> List[RecipeRecord]:
         # 提取标题
         title = _extract_title_from_chunk(full_body, doc_name)
 
-        # 尝试在 stub 中找匹配的菜谱
-        stub_match = stub_map.get(title) or stub_map.get(doc_key)
+        # 尝试在 stub 中找匹配的菜谱（用清洗后的 doc_key）
+        clean_key = _clean_doc_key(doc_key)
+        stub_match = stub_map.get(title) or stub_map.get(doc_key) or stub_map.get(clean_key)
         # 也尝试在 SEED_RECIPES 中做标题模糊匹配
         if not stub_match:
             for r in SEED_RECIPES:
@@ -108,7 +124,7 @@ def _chunks_to_recipes(chunks: List[dict]) -> List[RecipeRecord]:
             # 有结构化数据：用 stub 的元数据 + RAGFlow 的检索分和 body
             recipe = RecipeRecord(
                 recipe_id=stub_match.recipe_id,
-                title=stub_match.title,
+                title=f'📖 {stub_match.title}',
                 cuisine=stub_match.cuisine,
                 tags=list(stub_match.tags),
                 difficulty=stub_match.difficulty,
@@ -126,8 +142,8 @@ def _chunks_to_recipes(chunks: List[dict]) -> List[RecipeRecord]:
             # 无结构化数据：从 chunk 内容尽力提取
             ingredients = _extract_ingredients_from_chunk(full_body)
             recipe = RecipeRecord(
-                recipe_id=doc_name.rsplit('.', 1)[0] if '.' in doc_name else doc_name,
-                title=title,
+                recipe_id=_clean_doc_key(doc_name),
+                title=f'📖 {title}',
                 cuisine="家常菜",
                 tags=[],
                 difficulty="中等",
@@ -268,8 +284,9 @@ class RAGFlowRetriever(BaseRetriever):
             doc_key = chunk.get("document_keyword", chunk.get("docnm_kwd", ""))
             if not doc_key:
                 continue
-            # 去掉文件后缀（.md / .txt / 无后缀均可）
-            rid = doc_key.rsplit(".", 1)[0] if "." in doc_key else doc_key
+            # 去掉文件后缀和目录前缀（.md / .txt / 无后缀均可）
+            base = doc_key.rsplit('/', 1)[-1] if '/' in doc_key else doc_key
+            rid = base.rsplit(".", 1)[0] if "." in base else base
             rid = rid.strip()
             if not rid:
                 continue
