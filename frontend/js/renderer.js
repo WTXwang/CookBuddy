@@ -117,19 +117,19 @@ const Renderer = {
     header.innerHTML = `找到 <strong>${recCount}</strong> 道菜，基于你的食材：<span class="ing-badge">${this._esc(ingNames)}</span>`;
     container.appendChild(header);
 
+    // Concierge 提示（放在卡片前，让用户先看到回应）
+    if (data.follow_up_question) {
+      const fq = document.createElement('p');
+      fq.style.cssText = 'font-size:14px;color:#78716c;margin:8px 0 4px;text-align:center;';
+      fq.textContent = '💡 ' + data.follow_up_question;
+      container.appendChild(fq);
+    }
+
     // 菜谱卡片
     data.recommendations.forEach((r, i) => {
       const card = this.createRecipeCard(r, i);
       container.appendChild(card);
     });
-
-    // 追问
-    if (data.follow_up_question) {
-      const fq = document.createElement('p');
-      fq.style.cssText = 'font-size:14px;color:#78716c;margin-top:12px;text-align:center;';
-      fq.textContent = '💡 ' + data.follow_up_question;
-      container.appendChild(fq);
-    }
 
     // 拦截信息
     if (data.blocked_recipes && data.blocked_recipes.length) {

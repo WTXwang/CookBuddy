@@ -66,6 +66,47 @@ def _lap(state: ChefState, key: str):
     state.stage_durations[key] = round((now - start) * 1000)  # ms
 
 
+def _build_conversation_context(state: ChefState) -> str:
+    """从完成的 pipeline state 构建自然语言上下文摘要，供下一轮对话参考"""
+    lines = []
+
+    if state.raw_input:
+        lines.append(f"上一轮用户说：{state.raw_input}")
+
+    # 约束信息
+    constraint_parts = []
+    if state.user_excluded:
+        constraint_parts.append(f"忌口{'、'.join(state.user_excluded)}")
+    if state.user_allergens:
+        constraint_parts.append(f"过敏{'、'.join(state.user_allergens)}")
+    if state.user_flavor:
+        constraint_parts.append(f"口味{state.user_flavor}")
+    if state.user_servings and state.user_servings != 2:
+        constraint_parts.append(f"{state.user_servings}人份")
+    if state.user_time_limit and state.user_time_limit != 30:
+        constraint_parts.append(f"{state.user_time_limit}分钟内")
+    difficulty = ""
+    if state.request and state.request.difficulty and state.request.difficulty != "任意":
+        difficulty = state.request.difficulty
+    if difficulty:
+        constraint_parts.append(f"难度{difficulty}")
+    if state.user_equipment:
+        constraint_parts.append(f"厨具{'、'.join(state.user_equipment)}")
+    if constraint_parts:
+        lines.append(f"上一轮约束：{'，'.join(constraint_parts)}")
+
+    # 食材
+    if state.raw_ingredients:
+        lines.append(f"上一轮食材：{'、'.join(state.raw_ingredients)}")
+
+    # 推荐了哪些菜
+    if state.response and state.response.recommendations:
+        titles = '、'.join([r.title for r in state.response.recommendations[:3]])
+        lines.append(f"推荐了：{titles}")
+
+    return '\n'.join(lines)
+
+
 async def node_concierge(state: ChefState) -> ChefState:
     """对话门面 + 意图路由（只分类，不提取字段）"""
     _timer(state, 'concierge')
@@ -83,9 +124,6 @@ async def node_concierge(state: ChefState) -> ChefState:
     state.intent = result.intent
     state.chat_reply = result.reply
     state.dish_name = result.dish_name
-
-    # 更新上下文，供下一轮对话使用
-    state.conversation_context = f"用户说：{text}\n助手回复：{result.reply}"
 
     _lap(state, 'concierge')
     return state
@@ -106,6 +144,7 @@ async def node_parser(state: ChefState) -> ChefState:
         excluded=req.excluded_ingredients if req else [],
         allergens=req.allergens if req else [],
         equipment=req.equipment if req else [],
+        context=state.conversation_context,
     )
 
     state.raw_ingredients = user_req.ingredients
@@ -344,6 +383,7 @@ async def node_safety(state: ChefState) -> ChefState:
 def node_output(state: ChefState) -> ChefState:
     """最终输出"""
     state.stage = GraphStage.OUTPUT
+    state.conversation_context = _build_conversation_context(state)
     if state.response:
         state.response.conversation_context = state.conversation_context
     return state

@@ -124,7 +124,7 @@ def _chunks_to_recipes(chunks: List[dict]) -> List[RecipeRecord]:
             # 有结构化数据：用 stub 的元数据 + RAGFlow 的检索分和 body
             recipe = RecipeRecord(
                 recipe_id=stub_match.recipe_id,
-                title=f'📖 {stub_match.title}',
+                title=f'[菜谱] {stub_match.title}',
                 cuisine=stub_match.cuisine,
                 tags=list(stub_match.tags),
                 difficulty=stub_match.difficulty,
@@ -143,7 +143,7 @@ def _chunks_to_recipes(chunks: List[dict]) -> List[RecipeRecord]:
             ingredients = _extract_ingredients_from_chunk(full_body)
             recipe = RecipeRecord(
                 recipe_id=_clean_doc_key(doc_name),
-                title=f'📖 {title}',
+                title=f'[菜谱] {title}',
                 cuisine="家常菜",
                 tags=[],
                 difficulty="中等",

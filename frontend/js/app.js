@@ -50,13 +50,18 @@ const App = {
       this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, 120) + 'px';
     });
 
-    // Chip 选择（同 key 互斥）
+    // Chip 选择（同 key 互斥，点击已选中则取消）
     document.querySelector('.constraint-scroll').addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
       if (!chip) return;
       const key = chip.dataset.key;
-      document.querySelectorAll(`.chip[data-key="${key}"]`).forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
+      if (chip.classList.contains('active')) {
+        // 取消选中
+        chip.classList.remove('active');
+      } else {
+        document.querySelectorAll(`.chip[data-key="${key}"]`).forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      }
     });
 
     // 示例卡片
@@ -408,8 +413,8 @@ const App = {
   _readConstraints() {
     const constraints = {
       servings: 2,
-      time_limit_min: 20,
-      difficulty: '简单',
+      time_limit_min: 30,
+      difficulty: '任意',
       flavor: '',
       excluded: [],
       allergens: [],
