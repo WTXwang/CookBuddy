@@ -124,13 +124,13 @@ const App = {
           Renderer.addUserMessage(msg.text, msg.tags);
         } else if (msg.role === 'ai' && msg.data) {
           const container = Renderer.addAIMessage();
-          // 区分闲聊和推荐：chat 回复没有 request_summary
+          // 区分闲聊和推荐
           if (msg.data.intent === 'chat' && msg.data.reply) {
-            Renderer.renderNoResult(container, msg.data.reply);
-          } else if (msg.data.request_summary) {
+            Renderer.renderChatReply(container, msg.data.reply);
+          } else if (msg.data.recommendations && msg.data.recommendations.length > 0) {
             Renderer.renderResult(container, msg.data);
           } else {
-            Renderer.renderNoResult(container, '历史记录格式已过期');
+            Renderer.renderNoResult(container, msg.data.follow_up_question || '历史记录格式已过期');
           }
         }
       });
@@ -172,6 +172,7 @@ const App = {
   },
 
   _loadConversations() {
+    this.conversations = [];
     try {
       const raw = localStorage.getItem(this._getStorageKey());
       if (raw) this.conversations = JSON.parse(raw);

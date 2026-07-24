@@ -203,7 +203,8 @@ const Renderer = {
     if (recipe.match_score < 80) badge.classList.add('warn');
 
     // 标题
-    card.querySelector('.card-title').textContent = recipe.title;
+    const cleanTitle = this._cleanTitle(recipe.title);
+    card.querySelector('.card-title').textContent = cleanTitle;
 
     // 元信息
     card.querySelector('.meta-time').textContent   = '⏱ ' + recipe.estimated_time_min + '分钟';
@@ -286,6 +287,23 @@ const Renderer = {
     if (constraints.difficulty && constraints.difficulty !== '任意') tags.push(constraints.difficulty);
     if (constraints.flavor && constraints.flavor !== '不限') tags.push(constraints.flavor);
     return tags;
+  },
+
+  /** 清洗菜谱标题：剥离目录前缀（如 cleaned/），加书本 emoji */
+  _cleanTitle(title) {
+    if (!title) return '未知菜谱';
+    let cleaned = title;
+    let hadPrefix = false;
+    // 如果标题中有路径分隔符，说明带目录前缀
+    if (cleaned.includes('/') || cleaned.includes('\\')) {
+      hadPrefix = true;
+      // 取最后一段（文件名部分）
+      cleaned = cleaned.replace(/\\/g, '/').split('/').pop().trim();
+      // 去掉文件后缀
+      cleaned = cleaned.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
+    }
+    if (!cleaned) return '未知菜谱';
+    return hadPrefix ? '📖 ' + cleaned : cleaned;
   },
 
   _esc(s) {

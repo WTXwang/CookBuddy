@@ -4,6 +4,7 @@ import asyncio
 from typing import List, Optional
 from schemas import SafetyReport, Recommendation
 from llm_client import create_chat_llm, chat_json_guarded
+from rules.normalizer import classify_ingredient
 import config
 
 
@@ -105,10 +106,13 @@ class FoodSafetyReviewer:
                 if allergen in step:
                     issues.append(f"步骤中含过敏原：{allergen}")
 
-        # 忌口
+        # 忌口（分类感知：忌口牛肉 → 匹配牛腩/牛腱等子类食材）
         for ex in user_excluded:
-            if ex in all_ings:
-                issues.append(f"忌口冲突：含{ex}")
+            ex_category = classify_ingredient(ex)
+            for ing in all_ings:
+                if ing == ex or classify_ingredient(ing) == ex_category:
+                    issues.append(f"忌口冲突：含{ex}（{ing}）")
+                    break
 
         # 生食风险
         for ing in rec.used_ingredients:

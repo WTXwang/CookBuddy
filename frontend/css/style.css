@@ -136,7 +136,6 @@ body {
   color: var(--text-muted); transition: var(--transition);
 }
 .sidebar-clear-btn:hover { background: #fee2e2; color: #dc2626; }
-}
 .sidebar-toggle-btn {
   background: none;
   border: none;
@@ -550,9 +549,14 @@ body {
 /* Constraint row */
 .constraint-row {
   margin-top: 10px; overflow-x: auto;
-  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
-.constraint-row::-webkit-scrollbar { display: none; }
+.constraint-row::-webkit-scrollbar { height: 5px; }
+.constraint-row::-webkit-scrollbar-track { background: transparent; }
+.constraint-row::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+.constraint-row::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 .constraint-scroll { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
 .chip {
   background: #faf6ef; border: 1.5px solid var(--border); border-radius: 22px;

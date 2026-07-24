@@ -2,6 +2,7 @@
 
 from typing import List
 from schemas import CandidateFeature, RecipeRecord
+from rules.normalizer import classify_ingredient
 
 
 # 难度权重（用于比较）
@@ -60,13 +61,17 @@ def build_feature(recipe: RecipeRecord,
                 blocked = True
                 block_reasons.append(f"核心食材含过敏原：{allergen}（{ci}）")
 
-    # 忌口冲突（硬阻断）
+    # 忌口冲突（硬阻断，分类感知：忌口牛肉 → 屏蔽牛腩/牛腱等子类食材）
     for ex in user_excluded:
         if not ex:
             continue
-        if ex in recipe.core_ingredients or ex in recipe.optional_ingredients:
-            blocked = True
-            block_reasons.append(f"含忌口食材：{ex}")
+        ex_category = classify_ingredient(ex)
+        all_recipe_ings = list(recipe.core_ingredients) + list(recipe.optional_ingredients)
+        for ing in all_recipe_ings:
+            if ing == ex or classify_ingredient(ing) == ex_category:
+                blocked = True
+                block_reasons.append(f"含忌口食材：{ex}（{ing}）")
+                break
 
     # ── 软约束评分 ──
 
