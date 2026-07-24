@@ -1,32 +1,12 @@
 """RAGFlow 真实检索 —— 通过 REST API 调用本地 RAGFlow 实例
 
-检索时自动展开食材别名，避免标准化后遗漏 KB 中的同义词。
-例: 用户搜"土豆"，实际查询为"土豆 马铃薯 洋芋"，确保 KB 中任何写法都能命中。
+RAGFlow 知识库中的菜谱是纯 markdown 格式（无 YAML 头部），
+chunk 只包含正文段落。检索策略：
+  1. 调 RAGFlow /api/v1/retrieval 获取相关 chunks
+  2. 按文档分组，取最高相似度作为检索分
+  3. 从 chunk 内容提取标题和食材信息构建 RecipeRecord
+  4. 如果菜谱在 stub 种子数据中存在，用 stub 的结构化元数据
 """
-
-
-def _expand_aliases(ingredients: list[str]) -> str:
-    """将食材列表展开为包含所有别名的搜索字符串"""
-    from rules.normalizer import SYNONYM_MAP
-
-    # 反向映射: 标准名 → [所有别名]
-    reverse: dict[str, list[str]] = {}
-    for alias, std in SYNONYM_MAP.items():
-        reverse.setdefault(std, []).append(alias)
-
-    expanded: set[str] = set()
-    for ing in ingredients:
-        ing = ing.strip()
-        if not ing:
-            continue
-        expanded.add(ing)
-        std = SYNONYM_MAP.get(ing, ing)
-        expanded.add(std)
-        for a in reverse.get(std, []):
-            expanded.add(a)
-
-    return " ".join(expanded)
-
 
 import re
 import json
@@ -209,7 +189,7 @@ class RAGFlowRetriever(BaseRetriever):
 
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:
                 return json.loads(resp.read().decode('utf-8'))
         except urllib.error.HTTPError as e:
             body_text = e.read().decode('utf-8', errors='replace')[:200] if e.fp else ''
@@ -250,8 +230,8 @@ class RAGFlowRetriever(BaseRetriever):
             "dataset_ids": [ds_id],
             "page": 1,
             "page_size": max(top_n, 10),
-            "similarity_threshold": 0.1,
-            "vector_similarity_weight": 0.5,
+            "similarity_threshold": 0.4,
+            "vector_similarity_weight": 0.7,
         }
         result = self._api("POST", "/api/v1/retrieval", body)
         if result and result.get("code") == 0:
@@ -269,7 +249,7 @@ class RAGFlowRetriever(BaseRetriever):
         if not self._available:
             return self._stub.search_ids(ingredients, top_n)
 
-        query = _expand_aliases(ingredients)
+        query = " ".join(ingredients)
         try:
             chunks = self._retrieve(query, top_n)
         except Exception as e:
@@ -305,11 +285,42 @@ class RAGFlowRetriever(BaseRetriever):
               f"{[(r[0], round(r[1], 2)) for r in result[:5]]}")
         return result[:top_n]
 
+    def _enrich_metadata(self, recipes: List[RecipeRecord]) -> None:
+        """对空 core_ingredients 的菜谱，用 LLM 从正文提取元数据"""
+        need_enrich = [r for r in recipes if not r.core_ingredients and r.body]
+        if not need_enrich:
+            return
+
+        try:
+            from recipes.meta import RecipeMetaStore
+            from recipes.extractor import llm_extract_recipe
+            import os
+
+            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "recipes.db")
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            meta = RecipeMetaStore(db_path=db_path, llm_extractor=llm_extract_recipe)
+
+            for r in need_enrich:
+                enriched = meta.get_or_create(r.recipe_id, r.body)
+                if enriched and enriched.core_ingredients:
+                    r.core_ingredients = enriched.core_ingredients
+                    r.seasonings = enriched.seasonings
+                    r.optional_ingredients = enriched.optional_ingredients
+                    r.equipment = enriched.equipment
+                    r.allergens = enriched.allergens
+                    r.difficulty = enriched.difficulty
+                    r.estimated_time_min = enriched.estimated_time_min
+                    r.cuisine = enriched.cuisine
+                    r.tags = enriched.tags
+                    print(f"[RAGFlow] 元数据补全: {r.title} core={r.core_ingredients}")
+        except Exception as e:
+            print(f"[RAGFlow] 元数据补全失败: {e}")
+
     def search(self, ingredients: List[str], top_n: int = 10) -> List[RecipeRecord]:
         if not self._available:
             return self._stub.search(ingredients, top_n)
 
-        query = _expand_aliases(ingredients)
+        query = " ".join(ingredients)
         try:
             chunks = self._retrieve(query, top_n)
         except Exception as e:
@@ -325,6 +336,9 @@ class RAGFlowRetriever(BaseRetriever):
 
         if not recipes:
             return self._stub.search(ingredients, top_n)
+
+        # 补全元数据：空 core_ingredients 的用 LLM 从正文提取
+        self._enrich_metadata(recipes)
 
         # 按检索分降序
         recipes.sort(key=lambda r: r.retrieval_score, reverse=True)
@@ -352,6 +366,7 @@ class RAGFlowRetriever(BaseRetriever):
         if not recipes:
             return self._stub.search_by_name(dish_name, top_n)
 
+        self._enrich_metadata(recipes)
         recipes.sort(key=lambda r: r.retrieval_score, reverse=True)
         result = recipes[:top_n]
 
@@ -382,7 +397,9 @@ class RAGFlowRetriever(BaseRetriever):
                     merged.append(r)
 
         if merged:
-            merged.sort(key=lambda r: r.retrieval_score, reverse=True)
+            self._enrich_metadata(merged)
+            import random
+            random.shuffle(merged)
             result = merged[:top_n]
             print(f"[RAGFlow] suggestions → {len(result)} 道: "
                   f"{[r.title for r in result]}")

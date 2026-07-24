@@ -115,7 +115,14 @@ const App = {
           Renderer.addUserMessage(msg.text, msg.tags);
         } else if (msg.role === 'ai' && msg.data) {
           const container = Renderer.addAIMessage();
-          Renderer.renderResult(container, msg.data);
+          // 区分闲聊和推荐：chat 回复没有 request_summary
+          if (msg.data.intent === 'chat' && msg.data.reply) {
+            Renderer.renderNoResult(container, msg.data.reply);
+          } else if (msg.data.request_summary) {
+            Renderer.renderResult(container, msg.data);
+          } else {
+            Renderer.renderNoResult(container, '历史记录格式已过期');
+          }
         }
       });
       this._scrollBottom();
@@ -288,7 +295,7 @@ const App = {
     const aiContainer = Renderer.addAIMessage();
     Renderer.createLoadingBox(aiContainer);
 
-    const apiUrl = (window.API_BASE || 'http://localhost:8000') + '/api/recommend';
+    const apiUrl = (window.API_BASE || 'http://localhost:8001') + '/api/recommend';
 
     fetch(apiUrl, {
       method: 'POST',

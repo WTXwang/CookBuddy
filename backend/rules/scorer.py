@@ -137,13 +137,13 @@ def score_and_rank(features: List[CandidateFeature]) -> List[CandidateFeature]:
     对非阻断菜谱打分并排序。阻断的菜直接丢弃，不返回。
 
     公式:
-      Base = 45*core_coverage + 15*retrieval + 10*preference
+      Base = 30*core_coverage + 30*retrieval + 10*preference
            + 10*time + 5*difficulty + 15*equip
       Penalty = 25*core_miss_ratio
               + (10 if overtime)
       Final = clamp(Base - Penalty, 0, 100)
 
-    排序: 缺失核心少的排前 → 厨具匹配优先 → 分高排前 → 检索分高排前
+    排序: 缺失核心少的排前 → 检索分高排前 → 分高排前
     """
     if not features:
         return features
@@ -163,8 +163,8 @@ def score_and_rank(features: List[CandidateFeature]) -> List[CandidateFeature]:
         core_coverage = f.core_matched / max(f.core_total, 1)
         retrieval_norm = max(0.0, min(1.0, f.retrieval_score))
 
-        base = (45 * core_coverage
-                + 15 * retrieval_norm
+        base = (30 * core_coverage
+                + 30 * retrieval_norm
                 + 10 * f.preference_score
                 + 10 * f.time_fit
                 + 5 * f.difficulty_fit
@@ -179,10 +179,9 @@ def score_and_rank(features: List[CandidateFeature]) -> List[CandidateFeature]:
         f.final_score = max(0, min(100, round(base - penalty)))
 
     active.sort(key=lambda f: (
-        len(f.missing_core),
-        -f.equipment_fit,      # 厨具匹配的优先
+        len(f.missing_core) / max(f.core_total, 1),  # 缺失比例，而非绝对数
+        -f.retrieval_score,    # RAGFlow 向量相关度优先
         -f.final_score,
-        -f.retrieval_score,
     ))
     return active
 

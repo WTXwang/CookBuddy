@@ -106,12 +106,15 @@ const Renderer = {
   /** 渲染完整推荐结果 */
   renderResult(container, data) {
     const summary = data.request_summary;
+    const ingNames = (summary && summary.ingredients)
+      ? summary.ingredients.map(i => i.name || i).join('、')
+      : '未知食材';
+    const recCount = (data.recommendations && data.recommendations.length) || 0;
 
     // 结果统计头
     const header = document.createElement('div');
     header.className = 'result-header';
-    const ingNames = summary.ingredients.map(i => i.name || i).join('、');
-    header.innerHTML = `找到 <strong>${data.recommendations.length}</strong> 道菜，基于你的食材：<span class="ing-badge">${this._esc(ingNames)}</span>`;
+    header.innerHTML = `找到 <strong>${recCount}</strong> 道菜，基于你的食材：<span class="ing-badge">${this._esc(ingNames)}</span>`;
     container.appendChild(header);
 
     // 菜谱卡片
